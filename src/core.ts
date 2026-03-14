@@ -256,33 +256,35 @@ async function updateTime(newTime: number) {
 
 export
 async function performTimerTick(newTime: number) {
-	const [scoreValueData, lastMatchData, comboData] = await Promise.all([
-		db.gamedata.get(DbCollectionItemNameGameDataScoreValue),
-		db.gamedata.get(DbCollectionItemNameGameDataLastMatchTime),
-		db.gamedata.get(DbCollectionItemNameGameDataComboCount),
-	]);
+	await db.transaction('rw', db.gamedata, async () => {
+		const [scoreValueData, lastMatchData, comboData] = await Promise.all([
+			db.gamedata.get(DbCollectionItemNameGameDataScoreValue),
+			db.gamedata.get(DbCollectionItemNameGameDataLastMatchTime),
+			db.gamedata.get(DbCollectionItemNameGameDataComboCount),
+		]);
 
-	if (!(scoreValueData && lastMatchData && comboData)) {
-		return;
-	}
+		if (!(scoreValueData && lastMatchData && comboData)) {
+			return;
+		}
 
-	const comboExpired = comboData.value > 0 && !isComboEligible(newTime, lastMatchData.value);
-	const newScoreValue = comboExpired
-		? SCORE_CONFIG.BASE_VALUE
-		: calculateDecayedScoreValue(scoreValueData.value, 1);
+		const comboExpired = comboData.value > 0 && !isComboEligible(newTime, lastMatchData.value);
+		const newScoreValue = comboExpired
+			? SCORE_CONFIG.BASE_VALUE
+			: calculateDecayedScoreValue(scoreValueData.value, 1);
 
-	const writes: Promise<unknown>[] = [
-		db.gamedata.update(DbCollectionItemNameGameDataTime, { value: newTime }),
-		db.gamedata.update(DbCollectionItemNameGameDataScoreValue, { value: newScoreValue }),
-	];
+		const writes: Promise<unknown>[] = [
+			db.gamedata.update(DbCollectionItemNameGameDataTime, { value: newTime }),
+			db.gamedata.update(DbCollectionItemNameGameDataScoreValue, { value: newScoreValue }),
+		];
 
-	if (comboExpired) {
-		writes.push(
-			db.gamedata.update(DbCollectionItemNameGameDataComboCount, { value: 0 }),
-		);
-	}
+		if (comboExpired) {
+			writes.push(
+				db.gamedata.update(DbCollectionItemNameGameDataComboCount, { value: 0 }),
+			);
+		}
 
-	await Promise.all(writes);
+		await Promise.all(writes);
+	});
 	localStorage.setItem(SavedGameKey, newTime.toString());
 }
 
@@ -315,113 +317,123 @@ async function updateMusicEnabled(enabled: boolean) {
 // Scoring database update functions
 export
 async function awardMatchScore(currentTime: number) {
-	const [scoreData, scoreValueData, lastMatchData, comboData, maxComboData] = await Promise.all([
-		db.gamedata.get(DbCollectionItemNameGameDataScore),
-		db.gamedata.get(DbCollectionItemNameGameDataScoreValue),
-		db.gamedata.get(DbCollectionItemNameGameDataLastMatchTime),
-		db.gamedata.get(DbCollectionItemNameGameDataComboCount),
-		db.gamedata.get(DbCollectionItemNameGameDataMaxCombo),
-	]);
+	return db.transaction('rw', db.gamedata, async () => {
+		const [scoreData, scoreValueData, lastMatchData, comboData, maxComboData] = await Promise.all([
+			db.gamedata.get(DbCollectionItemNameGameDataScore),
+			db.gamedata.get(DbCollectionItemNameGameDataScoreValue),
+			db.gamedata.get(DbCollectionItemNameGameDataLastMatchTime),
+			db.gamedata.get(DbCollectionItemNameGameDataComboCount),
+			db.gamedata.get(DbCollectionItemNameGameDataMaxCombo),
+		]);
 
-	if (!(scoreData && scoreValueData && lastMatchData && comboData && maxComboData)) {
-		return null;
-	}
+		if (!(scoreData && scoreValueData && lastMatchData && comboData && maxComboData)) {
+			return null;
+		}
 
-	const isCombo = isComboEligible(currentTime, lastMatchData.value);
-	const newComboCount = isCombo ? comboData.value + 1 : 0;
-	const newMaxCombo = Math.max(maxComboData.value, newComboCount);
-	const currentScoreValue = scoreValueData.value;
-	const newScore = scoreData.value + currentScoreValue;
-	const newScoreValue = calculateScoreValueWithCombo(
-		currentScoreValue,
-		newComboCount
-	);
+		const isCombo = isComboEligible(currentTime, lastMatchData.value);
+		const newComboCount = isCombo ? comboData.value + 1 : 0;
+		const newMaxCombo = Math.max(maxComboData.value, newComboCount);
+		const currentScoreValue = scoreValueData.value;
+		const newScore = scoreData.value + currentScoreValue;
+		const newScoreValue = calculateScoreValueWithCombo(
+			currentScoreValue,
+			newComboCount
+		);
 
-	await Promise.all([
-		db.gamedata.update(DbCollectionItemNameGameDataScore, { value: newScore }),
-		db.gamedata.update(DbCollectionItemNameGameDataScoreValue, { value: newScoreValue }),
-		db.gamedata.update(DbCollectionItemNameGameDataLastMatchTime, { value: currentTime }),
-		db.gamedata.update(DbCollectionItemNameGameDataComboCount, { value: newComboCount }),
-		db.gamedata.update(DbCollectionItemNameGameDataMaxCombo, { value: newMaxCombo }),
-	]);
+		await Promise.all([
+			db.gamedata.update(DbCollectionItemNameGameDataScore, { value: newScore }),
+			db.gamedata.update(DbCollectionItemNameGameDataScoreValue, { value: newScoreValue }),
+			db.gamedata.update(DbCollectionItemNameGameDataLastMatchTime, { value: currentTime }),
+			db.gamedata.update(DbCollectionItemNameGameDataComboCount, { value: newComboCount }),
+			db.gamedata.update(DbCollectionItemNameGameDataMaxCombo, { value: newMaxCombo }),
+		]);
 
-	return { pointsAwarded: currentScoreValue, comboCount: newComboCount, maxCombo: newMaxCombo };
+		return { pointsAwarded: currentScoreValue, comboCount: newComboCount, maxCombo: newMaxCombo };
+	});
 }
 
 export
 async function penalizeInvalidSet() {
-	const scoreValueData = await db.gamedata.get(DbCollectionItemNameGameDataScoreValue);
+	return db.transaction('rw', db.gamedata, async () => {
+		const scoreValueData = await db.gamedata.get(DbCollectionItemNameGameDataScoreValue);
 
-	if (!scoreValueData) {
-		return null;
-	}
+		if (!scoreValueData) {
+			return null;
+		}
 
-	const newValue = applyPenalty(scoreValueData.value, SCORE_CONFIG.INVALID_SET_PENALTY);
+		const newValue = applyPenalty(scoreValueData.value, SCORE_CONFIG.INVALID_SET_PENALTY);
 
-	await db.gamedata.update(DbCollectionItemNameGameDataScoreValue, {
-		value: newValue,
+		await db.gamedata.update(DbCollectionItemNameGameDataScoreValue, {
+			value: newValue,
+		});
+
+		return SCORE_CONFIG.INVALID_SET_PENALTY;
 	});
-
-	return SCORE_CONFIG.INVALID_SET_PENALTY;
 }
 
 export
 async function penalizeUnnecessaryShuffle() {
-	const scoreValueData = await db.gamedata.get(DbCollectionItemNameGameDataScoreValue);
+	return db.transaction('rw', db.gamedata, async () => {
+		const scoreValueData = await db.gamedata.get(DbCollectionItemNameGameDataScoreValue);
 
-	if (!scoreValueData) {
-		return null;
-	}
+		if (!scoreValueData) {
+			return null;
+		}
 
-	const newValue = applyPenalty(scoreValueData.value, SCORE_CONFIG.SHUFFLE_WITH_SET_PENALTY);
+		const newValue = applyPenalty(scoreValueData.value, SCORE_CONFIG.SHUFFLE_WITH_SET_PENALTY);
 
-	await db.gamedata.update(DbCollectionItemNameGameDataScoreValue, {
-		value: newValue,
+		await db.gamedata.update(DbCollectionItemNameGameDataScoreValue, {
+			value: newValue,
+		});
+
+		return SCORE_CONFIG.SHUFFLE_WITH_SET_PENALTY;
 	});
-
-	return SCORE_CONFIG.SHUFFLE_WITH_SET_PENALTY;
 }
 
 export
 async function shuffleDeck() {
-	const deck = await db.setorders.get(DbCollectionItemNameSetOrdersDeck);
-	const shuffleCount = await db.gamedata.get(DbCollectionItemNameGameDataShuffleCount);
+	await db.transaction('rw', [db.setorders, db.gamedata], async () => {
+		const deck = await db.setorders.get(DbCollectionItemNameSetOrdersDeck);
+		const shuffleCount = await db.gamedata.get(DbCollectionItemNameGameDataShuffleCount);
 
-	if(!(deck && shuffleCount)) {
-		return;
-	}
+		if(!(deck && shuffleCount)) {
+			return;
+		}
 
-	await Promise.all([
-		db.setorders.update(DbCollectionItemNameSetOrdersDeck, {
-			order: randomizeArray(deck.order),
-		}),
-		db.gamedata.update(DbCollectionItemNameGameDataShuffleCount, {
-			value: shuffleCount.value + 1,
-		}),
-	]);
+		await Promise.all([
+			db.setorders.update(DbCollectionItemNameSetOrdersDeck, {
+				order: randomizeArray(deck.order),
+			}),
+			db.gamedata.update(DbCollectionItemNameGameDataShuffleCount, {
+				value: shuffleCount.value + 1,
+			}),
+		]);
+	});
 }
 
 export
 async function discardCards(discardCardIds: string[], boardSize: number) {
-	const deckOrder = await db.setorders.get(DbCollectionItemNameSetOrdersDeck);
-	const discardPile = await db.setorders.get(DbCollectionItemNameSetOrdersDiscard);
+	await db.transaction('rw', db.setorders, async () => {
+		const deckOrder = await db.setorders.get(DbCollectionItemNameSetOrdersDeck);
+		const discardPile = await db.setorders.get(DbCollectionItemNameSetOrdersDiscard);
 
-	if(!(deckOrder && discardPile)) {
-		return;
-	}
+		if(!(deckOrder && discardPile)) {
+			return;
+		}
 
-	const selectedIndexes = discardCardIds.map(selectedId => deckOrder.order.indexOf(selectedId)) as [number, number, number];
+		const selectedIndexes = discardCardIds.map(selectedId => deckOrder.order.indexOf(selectedId)) as [number, number, number];
 
-	await Promise.all([
-		db.setorders.update(DbCollectionItemNameSetOrdersDeck, {
-			order: deckOrder.order.length > boardSize ?
-				dealNewCards(deckOrder.order, selectedIndexes, boardSize):
-				deckOrder.order.filter(id => !discardCardIds.includes(id)),
-		}),
-		db.setorders.update(DbCollectionItemNameSetOrdersDiscard, {
-			order: [...discardPile.order, ...discardCardIds]
-		}),
-	]);
+		await Promise.all([
+			db.setorders.update(DbCollectionItemNameSetOrdersDeck, {
+				order: deckOrder.order.length > boardSize ?
+					dealNewCards(deckOrder.order, selectedIndexes, boardSize):
+					deckOrder.order.filter(id => !discardCardIds.includes(id)),
+			}),
+			db.setorders.update(DbCollectionItemNameSetOrdersDiscard, {
+				order: [...discardPile.order, ...discardCardIds]
+			}),
+		]);
+	});
 }
 
 function dealNewCards(cardOrderIds: string[], removeCardIndexes: [number, number, number], dealtCardCount: number) {

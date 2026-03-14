@@ -56,19 +56,22 @@ function GamePlayArea() {
 	const [gameGeneration, setGameGeneration] = useState(0);
 	const [manualGameComplete, setManualGameComplete] = useState(false);
 	const prevDiscardLengthRef = useRef<number | null>(null);
+	const discardTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 	const deckOrder = useDeckOrder();
 	const discardPile = useDiscardPile();
 	const dealtCards = deck?.slice(0, BoardCardCount);
 	const animatedCardsLeft = useAnimatedNumber(deck.length);
 	const canShuffle = deck.length > 0 && discardingCards.length === 0;
 
+	const deckLoaded = !!deckOrder;
 	const gameComplete = useMemo(() => (
-		manualGameComplete || deck.length === 0
-	), [manualGameComplete, deck.length]);
+		deckLoaded && (manualGameComplete || deck.length === 0)
+	), [deckLoaded, manualGameComplete, deck.length]);
 
 	// Reset combo state when the game screen mounts (continuing a game should not preserve combo)
 	useEffect(() => {
 		resetComboState();
+		return () => clearTimeout(discardTimeoutRef.current);
 	}, []);
 
 	// Detect new game start (discard pile reset) and clear local state
@@ -314,7 +317,7 @@ function GamePlayArea() {
 			// Delay DB removal so convergence animation plays while cards
 			// are still grid items (avoids popLayout z-index issues).
 			// Timing: 350ms glow delay + 700ms animation + 50ms buffer
-			setTimeout(() => {
+			discardTimeoutRef.current = setTimeout(() => {
 				discardCards(newSelectedCardIds, BoardCardCount);
 			}, 1100);
 			soundEffects('success');

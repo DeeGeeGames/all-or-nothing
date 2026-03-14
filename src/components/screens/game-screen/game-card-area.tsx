@@ -105,12 +105,11 @@ function GameCardArea(props: Props) {
 	const convergenceData = useConvergenceAnimation(discardingCardIds, cards);
 
 	useEffect(() => {
-		setCards(rawCards);
-
 		const insertedCards = rawCards.filter(rawCard => !cards.find(card => card.id === rawCard.id));
 
+		setCards(rawCards);
+
 		setNewCards(
-			// TODO Figure out a more solid way of doing this.
 			insertedCards.length > 3 ?
 				rawCards :
 				insertedCards,
@@ -120,7 +119,7 @@ function GameCardArea(props: Props) {
 	}, [JSON.stringify(rawCards)]);
 
 	useInterval(() => {
-		setNewCards(newCards.slice(1));
+		setNewCards(prev => prev.slice(1));
 	}, newCards.length ? 150 : null);
 
 	// Set active group when cards are ready and not paused
