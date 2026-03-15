@@ -6,7 +6,7 @@ import '@fontsource/roboto/700.css';
 
 import TitleScreen from './components/screens/title-screen';
 import { Screens } from './types';
-import { lazy, Suspense, useMemo, useEffect } from 'react';
+import { lazy, Suspense, useMemo, useEffect, useLayoutEffect } from 'react';
 import Loader from './components/loader';
 import { useGamepadManager, useKeyboardManager } from './input/input-hooks';
 import { useEventListener } from 'usehooks-ts';
@@ -18,6 +18,7 @@ import {
 	useUsingNavigationalInput,
 	useLoadAudioSettings,
 	useSetupDebugUtilities,
+	useSplashComplete,
 } from './atoms';
 import { useNavigate, useSelectCurrent } from './focus/focus-atoms';
 import { useInitializeThemes, useGameTheme } from './themes';
@@ -58,10 +59,11 @@ function App() {
 	useInitializeThemes();
 
 	const gameTheme = useGameTheme();
+	const splashComplete = useSplashComplete();
 
-	useEffect(() => {
-		document.body.style.background = gameTheme.background.body;
-	}, [gameTheme]);
+	useLayoutEffect(() => {
+		document.body.style.background = splashComplete ? gameTheme.background.body : '#000';
+	}, [gameTheme.background.body, splashComplete]);
 
 	const ActiveScreenComponent = ScreenComponents[activeScreen];
 

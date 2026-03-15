@@ -346,11 +346,13 @@ export default function Landing() {
 	useGamepadManager(stablePromptInputHandler);
 	useKeyboardManager(stablePromptInputHandler);
 
+	const needsFadeIn = useRef(!splashComplete).current;
+
 	const handleFadeInComplete = useCallback(() => {
-		if (splashComplete) return;
+		if (!needsFadeIn) return;
 		setSplashComplete(true);
 		setPhase('dealing');
-	}, [splashComplete, setSplashComplete]);
+	}, [needsFadeIn, setSplashComplete]);
 
 	const initialState = (prefersReducedMotion || splashComplete) ? false as const : 'hidden' as const;
 	const isMatched = phase === 'matched';
@@ -358,10 +360,14 @@ export default function Landing() {
 
 	return (
 		<motion.div
-			initial={{ opacity: splashComplete ? 1 : 0 }}
+			initial={{ opacity: needsFadeIn ? 0 : 1 }}
 			animate={{ opacity: 1 }}
-			transition={splashComplete ? { duration: 0 } : { duration: 1, ease: 'easeInOut' }}
+			transition={needsFadeIn ? { duration: 1, ease: 'easeInOut' } : { duration: 0 }}
 			onAnimationComplete={handleFadeInComplete}
+			style={needsFadeIn ? {
+				background: gameTheme.background.body,
+				minHeight: '100vh',
+			} : undefined}
 		>
 		<Container sx={{textAlign: 'center'}}>
 			<Box
@@ -404,7 +410,7 @@ export default function Landing() {
 				<motion.div
 					variants={titleContainerVariants}
 					initial={initialState}
-					animate="visible"
+					animate={splashComplete ? 'visible' : initialState}
 				>
 					<Typography
 						fontWeight={100}

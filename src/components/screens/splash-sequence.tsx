@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
+import { useEventListener } from 'usehooks-ts';
 import { useSetActiveScreen } from '@/atoms';
 import { Screens } from '@/types';
 import ReactSplash from './splash-screens/react-splash';
@@ -21,12 +22,24 @@ export default function SplashSequence() {
 	const isTransitioning = useRef(false);
 	const holdTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 	const fadeStartRef = useRef(Date.now());
+	const phaseRef = useRef<Phase>(phase);
+	const screenIndexRef = useRef(screenIndex);
 	const setActiveScreen = useSetActiveScreen();
+
+	phaseRef.current = phase;
+	screenIndexRef.current = screenIndex;
 
 	const currentScreen = splashScreens[screenIndex];
 
+	const beginFadeOut = useCallback((duration: number) => {
+		isTransitioning.current = true;
+		clearTimeout(holdTimerRef.current);
+		setFadeDuration(duration);
+		setPhase('fade-out');
+	}, []);
+
 	const advanceToNextScreen = useCallback(() => {
-		const nextIndex = screenIndex + 1;
+		const nextIndex = screenIndexRef.current + 1;
 
 		if (nextIndex >= splashScreens.length) {
 			setActiveScreen(Screens.Title);
@@ -36,41 +49,33 @@ export default function SplashSequence() {
 		setScreenIndex(nextIndex);
 		setPhase('fade-in');
 		setFadeDuration(FADE_SECONDS);
-		fadeStartRef.current = Date.now();
 		isTransitioning.current = false;
-	}, [screenIndex, setActiveScreen]);
+	}, [setActiveScreen]);
 
 	const handleAnimationComplete = useCallback(() => {
-		if (phase === 'fade-in') {
+		if (phaseRef.current === 'fade-in') {
 			setPhase('hold');
 		}
 
-		if (phase === 'fade-out') {
+		if (phaseRef.current === 'fade-out') {
 			advanceToNextScreen();
 		}
-	}, [phase, advanceToNextScreen]);
-
-	const beginFadeOut = useCallback((duration: number) => {
-		isTransitioning.current = true;
-		clearTimeout(holdTimerRef.current);
-		setFadeDuration(duration);
-		setPhase('fade-out');
-	}, []);
+	}, [advanceToNextScreen]);
 
 	const handleSkip = useCallback(() => {
 		if (isTransitioning.current) return;
 
-		if (phase === 'fade-in') {
+		if (phaseRef.current === 'fade-in') {
 			const elapsed = (Date.now() - fadeStartRef.current) / 1000;
 			const fraction = Math.min(elapsed / FADE_SECONDS, 1);
 			beginFadeOut(Math.max(fraction * FADE_SECONDS, 0.15));
 			return;
 		}
 
-		if (phase === 'hold') {
+		if (phaseRef.current === 'hold') {
 			beginFadeOut(FADE_SECONDS);
 		}
-	}, [phase, beginFadeOut]);
+	}, [beginFadeOut]);
 
 	// Hold timer
 	useEffect(() => {
@@ -92,19 +97,8 @@ export default function SplashSequence() {
 	}, [phase]);
 
 	// Skip input listeners
-	useEffect(() => {
-		const handler = () => handleSkip();
-
-		document.addEventListener('click', handler);
-		document.addEventListener('touchstart', handler, { passive: true });
-		document.addEventListener('keydown', handler);
-
-		return () => {
-			document.removeEventListener('click', handler);
-			document.removeEventListener('touchstart', handler);
-			document.removeEventListener('keydown', handler);
-		};
-	}, [handleSkip]);
+	useEventListener('pointerdown', handleSkip);
+	useEventListener('keydown', handleSkip);
 
 	const opacity = phase === 'fade-out' ? 0 : 1;
 	const Content = currentScreen?.content;
