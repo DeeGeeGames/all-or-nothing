@@ -5,6 +5,17 @@ import { useSetActiveScreen } from '@/atoms';
 import { Screens } from '@/types';
 import ReactSplash from './splash-screens/react-splash';
 import LibrariesSplash from './splash-screens/libraries-splash';
+import jotaiLogoUrl from './splash-screens/logos/jotai.png';
+import motionLogoUrl from './splash-screens/logos/motion.png';
+
+const pngUrls = [jotaiLogoUrl, motionLogoUrl];
+pngUrls.forEach((url) => {
+	const link = document.createElement('link');
+	link.rel = 'prefetch';
+	link.as = 'image';
+	link.href = url;
+	document.head.appendChild(link);
+});
 
 const FADE_SECONDS = 1;
 
