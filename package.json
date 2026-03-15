@@ -1,6 +1,6 @@
 {
 	"name": "all-or-nothing-game",
-	"version": "1.15.9",
+	"version": "1.15.10",
 	"type": "module",
 	"main": "dist-electron/main.js",
 	"browserslist": "chrome > 140",
