@@ -17,6 +17,7 @@ type BitwiseValue = Enum<typeof BitwiseValues>;
 
 export
 const Screens = {
+	Splash: 'splash',
 	Title: 'title',
 	Game: 'game',
 	About: 'about',

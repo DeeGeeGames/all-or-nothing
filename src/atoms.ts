@@ -93,7 +93,7 @@ function useSetForcedPlatform() {
 
 const pausedAtom = atom(false);
 
-const activeScreenAtom = atom<Screens>(Screens.Title);
+const activeScreenAtom = atom<Screens>(Screens.Splash);
 
 export
 function useActiveScreen() {
@@ -103,6 +103,18 @@ function useActiveScreen() {
 export
 function useSetActiveScreen() {
 	return useSetAtom(activeScreenAtom);
+}
+
+const splashCompleteAtom = atom(false);
+
+export
+function useSplashComplete() {
+	return useAtomValue(splashCompleteAtom);
+}
+
+export
+function useSetSplashComplete() {
+	return useSetAtom(splashCompleteAtom);
 }
 
 export
