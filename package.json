@@ -38,7 +38,7 @@
 		"cross-env": "^10.1.0",
 		"dexie": "^4.3.0",
 		"dexie-react-hooks": "^4.2.0",
-		"electron": "^40.8.0",
+		"electron": "^41.0.2",
 		"electron-builder": "^26.0.12",
 		"framer-motion": "^12.34.3",
 		"jotai": "^2.18.0",
