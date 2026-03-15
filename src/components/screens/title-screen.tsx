@@ -1,7 +1,7 @@
 import PlayingCard from '../playing-card';
 import { BitwiseValue, Card, Screens } from '../../types';
 import { resetGame, randomChoice } from '../../utils';
-import { useSetActiveScreen, useActiveController } from '../../atoms';
+import { useSetActiveScreen, useActiveController, useSplashComplete, useSetSplashComplete } from '../../atoms';
 import { useSetActiveGroup } from '@/focus/focus-atoms';
 import { useGameTheme } from '@/themes';
 import { fireConvergenceConfetti } from '@/confetti';
@@ -104,7 +104,7 @@ const buttonVariants = {
 
 // --- Demo match loop constants ---
 
-type DemoPhase = 'dealing' | 'idle' | 'selecting' | 'matched' | 'empty';
+type DemoPhase = 'waiting' | 'dealing' | 'idle' | 'selecting' | 'matched' | 'empty';
 
 const CARD_WIDTH = 100;
 const SELECTION_INTERVAL = 600;
@@ -188,9 +188,11 @@ function measureConvergenceOffsets(container: HTMLElement | null): readonly [num
 // --- Component ---
 
 export default function Landing() {
+	const splashComplete = useSplashComplete();
+	const setSplashComplete = useSetSplashComplete();
 	const [savedGameTime] = useState(getSavedGameTime);
 	const [demoCards, setDemoCards] = useState(generateValidSet);
-	const [phase, setPhase] = useState<DemoPhase>('dealing');
+	const [phase, setPhase] = useState<DemoPhase>(splashComplete ? 'dealing' : 'waiting');
 	const [selectedCount, setSelectedCount] = useState(0);
 	const [measuredOffsets, setMeasuredOffsets] = useState<readonly [number, number, number]>([0, 0, 0]);
 	const setActiveScreen = useSetActiveScreen();
@@ -344,11 +346,23 @@ export default function Landing() {
 	useGamepadManager(stablePromptInputHandler);
 	useKeyboardManager(stablePromptInputHandler);
 
-	const initialState = prefersReducedMotion ? false as const : 'hidden' as const;
+	const handleFadeInComplete = useCallback(() => {
+		if (splashComplete) return;
+		setSplashComplete(true);
+		setPhase('dealing');
+	}, [splashComplete, setSplashComplete]);
+
+	const initialState = (prefersReducedMotion || splashComplete) ? false as const : 'hidden' as const;
 	const isMatched = phase === 'matched';
 	const isSelecting = phase === 'selecting';
 
 	return (
+		<motion.div
+			initial={{ opacity: splashComplete ? 1 : 0 }}
+			animate={{ opacity: 1 }}
+			transition={splashComplete ? { duration: 0 } : { duration: 1, ease: 'easeInOut' }}
+			onAnimationComplete={handleFadeInComplete}
+		>
 		<Container sx={{textAlign: 'center'}}>
 			<Box
 				ref={containerRef}
@@ -362,7 +376,7 @@ export default function Landing() {
 				const staticAnimations = demoCardAnimations[index];
 				if (!staticAnimations) return null;
 
-				const animate = prefersReducedMotion
+				const animate = prefersReducedMotion || phase === 'waiting'
 					? undefined
 					: phase === 'matched'
 						? matchedAnimation(measuredOffsets[index] ?? 0)
@@ -422,7 +436,7 @@ export default function Landing() {
 				<motion.div
 					variants={buttonContainerVariants}
 					initial={initialState}
-					animate={isPlatformReady ? 'visible' : initialState}
+					animate={(isPlatformReady && splashComplete) ? 'visible' : initialState}
 				>
 					<Box display="flex" flexDirection="column" gap={2}>
 						<motion.div variants={buttonVariants}>
@@ -566,6 +580,7 @@ export default function Landing() {
 				</DialogActions>
 			</Dialog>
 		</Container>
+		</motion.div>
 	);
 }
 
