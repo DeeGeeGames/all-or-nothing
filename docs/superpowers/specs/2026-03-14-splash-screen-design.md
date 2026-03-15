@@ -40,7 +40,7 @@ With the default config (2s hold), each splash screen totals 4s (skippable). Ful
 
 ## Transition to Title Screen
 
-1. After the last splash screen fades out, `SplashSequence` calls `setActiveScreen(Screens.Title)` — but does **not** set `splashCompleteAtom` yet
+1. After the last splash screen fades out, `SplashSequence` calls `setActiveScreen(Screens.Title)` — but does **not** set `splashCompleteAtom` yet. This causes `SplashSequence` to unmount and `TitleScreen` to mount via the existing `ScreenComponents` map. The title screen fade-in is entirely self-contained in `title-screen.tsx` — it does not depend on `SplashSequence` being mounted.
 2. The title screen reads `splashCompleteAtom`. If `false`, it renders with a fade-in (opacity 0 → 1 over 1s). If `true`, it renders immediately with no fade-in.
 3. On the fade-in's `onAnimationComplete`, the title screen sets `splashCompleteAtom` to `true`. The card demo animation loop's initial phase is gated behind this atom — it initializes in a `waiting` state instead of `dealing`, and only transitions to `dealing` once `splashCompleteAtom` becomes `true`. All other title screen animations (title text stagger, button stagger) are also deferred until after the fade-in completes, so nothing animates behind a partially transparent screen.
 4. This guarantees: splash fade-out (1s) → title fade-in (1s) → atom set to `true` → card animation begins
@@ -51,7 +51,7 @@ With the default config (2s hold), each splash screen totals 4s (skippable). Ful
 
 - Global event listeners registered on mount: `click`, `touchstart` (with `{ passive: true }`), `keydown`
 - Any event triggers advancement to the next screen in the sequence
-- Events call `stopPropagation()` to prevent conflicts with app-level input handlers (e.g., the `activeController` logic in `app.tsx`)
+- App-level input handlers (e.g., `activeController` logic in `app.tsx`) are inert during the splash screen — no special propagation handling needed
 - If currently in fade-in phase: begins fade-out from current opacity, with duration proportional to current opacity (e.g., if at 0.3 opacity, fade-out takes 0.3s instead of full 1s)
 - If currently in hold phase: begins full 1s fade-out immediately
 - If already in fade-out phase: no-op (let it finish)
