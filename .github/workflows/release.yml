@@ -49,6 +49,8 @@ jobs:
             asset_glob: |
               dist/desktop/*.AppImage
               dist/desktop/*.flatpak
+            steam_artifact_name: steam-linux
+            steam_artifact_path: dist/desktop/linux-unpacked
           - os: windows-latest
             platform: win
             package_cmd: "npx electron-builder --win --config electron-builder.config.ts"
@@ -56,6 +58,8 @@ jobs:
             asset_glob: |
               dist/desktop/*.exe
               dist/desktop/*.zip
+            steam_artifact_name: steam-windows
+            steam_artifact_path: dist/desktop/win-unpacked
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
@@ -83,6 +87,11 @@ jobs:
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.asset_glob }}
+      - name: Upload unpacked build for Steam
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.steam_artifact_name }}
+          path: ${{ matrix.steam_artifact_path }}
 
   create_release:
     needs: build_desktop
@@ -160,6 +169,31 @@ jobs:
         run: ./butler push desktop-linux/*.flatpak deegeegames/all-or-nothing:linux-flatpak --userversion "${{ github.ref_name }}"
       - name: Push Windows build
         run: ./butler push desktop-windows deegeegames/all-or-nothing:windows --userversion "${{ github.ref_name }}"
+
+  deploy_steam:
+    needs: build_desktop
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Windows build
+        uses: actions/download-artifact@v4
+        with:
+          name: steam-windows
+          path: builds/windows
+      - name: Download Linux build
+        uses: actions/download-artifact@v4
+        with:
+          name: steam-linux
+          path: builds/linux
+      - uses: game-ci/steam-deploy@v3
+        with:
+          username: ${{ secrets.STEAM_USERNAME }}
+          configVdf: ${{ secrets.STEAM_CONFIG_VDF }}
+          appId: ${{ secrets.STEAM_APP_ID }}
+          buildDescription: ${{ github.ref_name }}
+          rootPath: builds
+          depot1Path: windows
+          depot2Path: linux
+          releaseBranch: prerelease
 
   sync_version:
     runs-on: ubuntu-latest
