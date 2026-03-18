@@ -15,8 +15,8 @@ jobs:
             vite_base: './'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -26,7 +26,7 @@ jobs:
       - run: npm run build
         env:
           VITE_BASE: ${{ matrix.vite_base }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.artifact_name }}
           path: dist/web
@@ -35,8 +35,8 @@ jobs:
     needs: build_web
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
         with:
           name: web-dist
           path: dist/web
@@ -71,8 +71,8 @@ jobs:
             steam_artifact_path: dist/desktop/win-unpacked
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -91,12 +91,12 @@ jobs:
         run: npm run build:electron
       - name: Package desktop (${{ matrix.platform }})
         run: ${{ matrix.package_cmd }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.asset_glob }}
       - name: Upload unpacked build for Steam
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.steam_artifact_name }}
           path: ${{ matrix.steam_artifact_path }}
@@ -107,11 +107,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           name: desktop-linux
           path: release-assets
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           name: desktop-windows
           path: release-assets
@@ -128,17 +128,17 @@ jobs:
       BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
     steps:
       - name: Download web build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: web-dist-itchio
           path: web
       - name: Download Linux build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: desktop-linux
           path: desktop-linux
       - name: Download Windows build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: desktop-windows
           path: desktop-windows
@@ -164,12 +164,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download Windows build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: steam-windows
           path: builds/windows
       - name: Download Linux build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: steam-linux
           path: builds/linux
@@ -190,7 +190,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: master
       - name: Update package.json version from tag
