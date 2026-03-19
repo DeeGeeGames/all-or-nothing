@@ -3,6 +3,9 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { registerSteamHandlers } from './steam-handlers';
 
+if (process.platform === 'linux') {
+	app.commandLine.appendSwitch('ozone-platform', 'x11');
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
