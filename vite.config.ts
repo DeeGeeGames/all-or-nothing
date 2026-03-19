@@ -34,6 +34,9 @@ export default defineConfig(async () => {
 				main: {
 					entry: 'electron/main.ts',
 					vite: {
+						define: {
+							__STEAM_APP_ID__: Number(process.env['STEAM_APP_ID'] || 480),
+						},
 						build: {
 							outDir: 'dist-electron',
 							rollupOptions: {

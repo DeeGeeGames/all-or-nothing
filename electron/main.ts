@@ -21,9 +21,9 @@ if (needsX11Fallback()) {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const STEAM_APP_ID = 480; // Replace with real app ID
+declare const __STEAM_APP_ID__: number;
 
-registerSteamHandlers(STEAM_APP_ID);
+registerSteamHandlers(__STEAM_APP_ID__);
 
 function createWindow() {
 	Menu.setApplicationMenu(null);

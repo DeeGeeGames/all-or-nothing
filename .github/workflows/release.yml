@@ -89,6 +89,8 @@ jobs:
         shell: bash
       - name: Build Electron app
         run: npm run build:electron
+        env:
+          STEAM_APP_ID: ${{ secrets.STEAM_APP_ID }}
       - name: Package desktop (${{ matrix.platform }})
         run: ${{ matrix.package_cmd }}
       - uses: actions/upload-artifact@v5
