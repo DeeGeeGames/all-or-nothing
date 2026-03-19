@@ -19,6 +19,13 @@ if (needsX11Fallback()) {
 	app.exit(0);
 }
 
+// The SUID sandbox (chrome-sandbox) requires root ownership and mode 4755,
+// which isn't feasible in containerized environments (Flatpak, Steam Linux Runtime, etc.).
+// Chromium's namespace sandbox and site isolation remain active.
+if (process.platform === 'linux') {
+	app.commandLine.appendSwitch('no-sandbox');
+}
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 declare const __STEAM_APP_ID__: number;
