@@ -1,0 +1,27 @@
+"InstallScript"
+{
+	"Run Process"
+	{
+		"all-or-nothing-game"
+		{
+			"process 1"		"chmod +x all-or-nothing-game"
+			"command 1"		"chmod"
+			"argument 1"	"+x all-or-nothing-game"
+			"nocleanup"		"1"
+		}
+		"chrome_crashpad_handler"
+		{
+			"process 1"		"chmod +x chrome_crashpad_handler"
+			"command 1"		"chmod"
+			"argument 1"	"+x chrome_crashpad_handler"
+			"nocleanup"		"1"
+		}
+		"chrome-sandbox"
+		{
+			"process 1"		"chmod +x chrome-sandbox"
+			"command 1"		"chmod"
+			"argument 1"	"+x chrome-sandbox"
+			"nocleanup"		"1"
+		}
+	}
+}

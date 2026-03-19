@@ -163,6 +163,9 @@ jobs:
     needs: build_desktop
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: steam
       - name: Download Windows build
         uses: actions/download-artifact@v5
         with:
@@ -182,6 +185,7 @@ jobs:
           rootPath: builds
           depot1Path: windows
           depot2Path: linux
+          depot2InstallScriptPath: steam/install_script_linux.vdf
           releaseBranch: prerelease
 
   sync_version:
