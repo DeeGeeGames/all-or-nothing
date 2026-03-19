@@ -1,18 +1,22 @@
 import { app, BrowserWindow, Menu } from 'electron';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { execSync } from 'child_process';
+import { readdirSync } from 'fs';
 import { registerSteamHandlers } from './steam-handlers';
 
-if (process.platform === 'linux') {
+function needsX11Fallback(): boolean {
+	if (process.platform !== 'linux') return false;
+	if (process.argv.includes('--ozone-platform=x11')) return false;
 	try {
-		const lspci = execSync('lspci', { encoding: 'utf-8' });
-		if (/nvidia/i.test(lspci)) {
-			app.commandLine.appendSwitch('ozone-platform', 'x11');
-		}
+		return readdirSync('/proc/driver/nvidia').length > 0;
 	} catch {
-		// lspci not available, let Electron pick the platform
+		return false;
 	}
+}
+
+if (needsX11Fallback()) {
+	app.relaunch({ args: [...process.argv.slice(1), '--ozone-platform=x11'] });
+	app.exit(0);
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
