@@ -1,10 +1,18 @@
 import { app, BrowserWindow, Menu } from 'electron';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 import { registerSteamHandlers } from './steam-handlers';
 
 if (process.platform === 'linux') {
-	app.commandLine.appendSwitch('ozone-platform', 'x11');
+	try {
+		const lspci = execSync('lspci', { encoding: 'utf-8' });
+		if (/nvidia/i.test(lspci)) {
+			app.commandLine.appendSwitch('ozone-platform', 'x11');
+		}
+	} catch {
+		// lspci not available, let Electron pick the platform
+	}
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
