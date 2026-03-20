@@ -38,6 +38,7 @@ import FocusableButton from '@/components/focusable-button';
 import PlatformButton from '@/components/platform-button';
 import { usePlatform } from '@/platform';
 import { getCurrentStreak } from '@/daily/daily-streaks';
+import SoundSpeedDial from '@/components/sound-speed-dial';
 
 // --- Title text animation constants ---
 
@@ -640,6 +641,7 @@ export default function Landing() {
 				</DialogActions>
 			</Dialog>
 		</Container>
+		<SoundSpeedDial />
 		</motion.div>
 	);
 }

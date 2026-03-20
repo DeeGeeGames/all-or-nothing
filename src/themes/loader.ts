@@ -99,6 +99,7 @@ async function loadTheme(entry: ThemeManifestEntry): Promise<GameTheme> {
 		shapes,
 		shapeNames: mergeBitwiseRecord(entry.shapeNames, defaultTheme.shapeNames),
 		music,
+		titleMusic: defaultTheme.titleMusic,
 		cardBack,
 		cardFace,
 		background: {

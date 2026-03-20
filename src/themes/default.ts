@@ -6,6 +6,7 @@ import song1 from '@/components/music-toggle/Little Prelude and Fugue - Sir Cubw
 import song2 from '@/components/music-toggle/No.9_Esther\'s Waltz - Esther Abrami.mp3';
 import song3 from '@/components/music-toggle/Sonatina No 2 in F Major Allegro - Joel Cummins.mp3';
 import song4 from '@/components/music-toggle/Theme for a One-Handed Piano Concerto - Sir Cubworth.mp3';
+import titleSong from '@/components/music-toggle/Baroque Coffee House - Doug Maxwell_Media Right Productions.mp3';
 
 export const defaultTheme: GameTheme = {
 	name: 'default',
@@ -35,6 +36,7 @@ export const defaultTheme: GameTheme = {
 		{ src: song3, volume: 0.1 },
 		{ src: song4, volume: 0.2 },
 	],
+	titleMusic: { src: titleSong, volume: 0.2 },
 	cardBack: 'repeating-linear-gradient(45deg, #606dbc, #606dbc 10px, #465298 10px, #465298 20px)',
 	cardFace: 'white',
 	background: {

@@ -91,6 +91,20 @@ function AboutScreen() {
 				</Box>
 				<Box paddingTop={3}>
 					<Typography component="em">
+						Baroque Coffee House
+					</Typography>
+					<Button
+						fullWidth
+						startIcon={<MusicNoteIcon/>}
+						endIcon={<LaunchIcon />}
+						target="_blank"
+						href="https://www.youtube.com/watch?v=Spo9h2opVAs&list=RDSpo9h2opVAs"
+					>
+						By Doug Maxwell/Media Right Productions
+					</Button>
+				</Box>
+				<Box paddingTop={3}>
+					<Typography component="em">
 						Sonatina No 2 in F Major Allegro
 					</Typography>
 					<Button

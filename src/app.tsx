@@ -22,6 +22,7 @@ import {
 } from './atoms';
 import { useNavigate, useSelectCurrent } from './focus/focus-atoms';
 import { useInitializeThemes, useGameTheme } from './themes';
+import { useTitleMusic } from './components/music-toggle';
 
 const Game = lazy(() => import('./components/screens/game-screen'));
 const About = lazy(() => import('./components/screens/about-screen'));
@@ -57,6 +58,7 @@ function App() {
 
 	useSetupDebugUtilities();
 	useInitializeThemes();
+	useTitleMusic(activeScreen === Screens.Splash || activeScreen === Screens.Title);
 
 	const gameTheme = useGameTheme();
 	const splashComplete = useSplashComplete();

@@ -3,21 +3,20 @@ import useSound from "use-sound";
 import { useEffect, useMemo, useState } from "react";
 import { randomChoice } from "@/utils";
 import { useGameTheme } from "@/themes";
+import type { MusicTrack } from "@/themes/types";
 
-export function useMusic() {
+function useManagedSound(track: MusicTrack, active: boolean) {
 	const isEnabled = useIsMusicEnabled();
-	const { music } = useGameTheme();
-	const activeSong = useMemo(() => randomChoice(...music), [music]);
 	const [isLoaded, setIsLoaded] = useState(false);
-	const [play, { stop }] = useSound(activeSong.src, {
-		volume: activeSong.volume,
+	const [play, { stop }] = useSound(track.src, {
+		volume: track.volume,
 		loop: true,
 		onload: () => setIsLoaded(true),
 	});
 
 	useEffect(() => {
 		setIsLoaded(false);
-	}, [activeSong.src]);
+	}, [track.src]);
 
 	useEffect(() => {
 		return stop;
@@ -26,8 +25,19 @@ export function useMusic() {
 	useEffect(() => {
 		if (!isLoaded) return;
 
-		isEnabled ?
+		(isEnabled && active) ?
 			play() :
 			stop();
-	}, [isEnabled, isLoaded]);
+	}, [isEnabled, isLoaded, active]);
+}
+
+export function useMusic() {
+	const { music } = useGameTheme();
+	const activeSong = useMemo(() => randomChoice(...music), [music]);
+	useManagedSound(activeSong, true);
+}
+
+export function useTitleMusic(active: boolean) {
+	const { titleMusic } = useGameTheme();
+	useManagedSound(titleMusic, active);
 }

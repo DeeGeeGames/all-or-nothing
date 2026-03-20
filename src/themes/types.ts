@@ -13,6 +13,7 @@ export interface GameTheme {
 	readonly shapes: Readonly<Record<BitwiseValue, FunctionComponent<SVGProps<SVGSVGElement>>>>;
 	readonly shapeNames: Readonly<Record<BitwiseValue, string>>;
 	readonly music: readonly MusicTrack[];
+	readonly titleMusic: MusicTrack;
 	readonly cardBack: string;
 	readonly cardFace: string;
 	readonly background: {
