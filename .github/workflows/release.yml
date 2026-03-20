@@ -15,8 +15,8 @@ jobs:
             vite_base: './'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -26,7 +26,7 @@ jobs:
       - run: npm run build
         env:
           VITE_BASE: ${{ matrix.vite_base }}
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}
           path: dist/web
@@ -35,8 +35,8 @@ jobs:
     needs: build_web
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v5
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
         with:
           name: web-dist
           path: dist/web
@@ -71,8 +71,8 @@ jobs:
             steam_artifact_path: dist/desktop/win-unpacked
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -93,7 +93,7 @@ jobs:
           STEAM_APP_ID: ${{ secrets.STEAM_APP_ID }}
       - name: Package desktop (${{ matrix.platform }})
         run: ${{ matrix.package_cmd }}
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.asset_glob }}
@@ -109,11 +109,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: desktop-linux
           path: release-assets
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: desktop-windows
           path: release-assets
@@ -165,7 +165,7 @@ jobs:
     needs: build_desktop
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: steam
       - name: Download Windows build
@@ -196,7 +196,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           ref: master
       - name: Update package.json version from tag
