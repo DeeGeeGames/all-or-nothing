@@ -31,6 +31,7 @@ import {
 	DialogContent,
 	DialogContentText,
 	DialogActions,
+	useMediaQuery,
 } from "@mui/material";
 import FocusableButton from '@/components/focusable-button';
 import PlatformButton from '@/components/platform-button';
@@ -205,6 +206,7 @@ export default function Landing() {
 	const [dailyStreak] = useState(getCurrentStreak);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const confettiTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+	const useSideLayout = useMediaQuery('(max-height: 800px) and (min-width: 700px)');
 
 	// Set focus group based on whether the tutorial prompt is open
 	useEffect(() => {
@@ -358,6 +360,185 @@ export default function Landing() {
 	const isMatched = phase === 'matched';
 	const isSelecting = phase === 'selecting';
 
+	const demoCardsSection = (
+		<Box
+			ref={containerRef}
+			paddingTop={useSideLayout ? 4 : 10}
+			height={200}
+			display="flex"
+			justifyContent="center"
+			gap={2}
+		>
+			{demoCards.map((card, index) => {
+			const staticAnimations = demoCardAnimations[index];
+			if (!staticAnimations) return null;
+
+			const animate = prefersReducedMotion || phase === 'waiting'
+				? undefined
+				: phase === 'matched'
+					? matchedAnimation(measuredOffsets[index] ?? 0)
+					: staticAnimations[phase];
+
+			return (
+				<motion.div
+					data-demo-card={index}
+					key={`${card.color}-${card.shape}-${card.fill}-${card.count}-${index}`}
+					initial={prefersReducedMotion ? false : demoCardInitial}
+					animate={animate}
+				>
+					<PlayingCard
+						width={CARD_WIDTH}
+						card={card}
+						raised={(isSelecting && index < selectedCount) || isMatched}
+						spin={isMatched}
+						flipped={isMatched}
+					/>
+				</motion.div>
+			);
+			})}
+		</Box>
+	);
+
+	const titleSection = (
+		<Box paddingY={useSideLayout ? 3 : 7}>
+			<motion.div
+				variants={titleContainerVariants}
+				initial={initialState}
+				animate={splashComplete ? 'visible' : initialState}
+			>
+				<Typography
+					fontWeight={100}
+					variant="h1"
+					fontSize={40}
+					sx={prefersReducedMotion ? {} : shimmerSx}
+				>
+					{titleSegments.flatMap(({ text, italic }, segIndex) =>
+						[...text].map((char, charIndex) => (
+							<motion.span
+								key={`${segIndex}-${charIndex}`}
+								variants={charVariants}
+								style={{
+									fontStyle: italic ? 'italic' : 'normal',
+									display: char === ' ' ? 'inline' : 'inline-block',
+								}}
+							>
+								{char === ' ' ? '\u00A0' : char}
+							</motion.span>
+						))
+					)}
+				</Typography>
+			</motion.div>
+		</Box>
+	);
+
+	const buttonsSection = (
+		<Box
+			display="inline-block"
+			width={300}
+		>
+			<motion.div
+				variants={buttonContainerVariants}
+				initial={initialState}
+				animate={(isPlatformReady && splashComplete) ? 'visible' : initialState}
+			>
+				<Box display="flex" flexDirection="column" gap={2}>
+					<motion.div variants={buttonVariants}>
+						<FocusableButton
+							id="menu-daily"
+							group="menu"
+							order={0}
+							startIcon={<TodayIcon />}
+							onClick={handleDaily}
+							autoFocus={!savedGameTime}
+						>
+							Daily Board{dailyStreak > 0 ? ` (${dailyStreak} day streak)` : ''}
+						</FocusableButton>
+					</motion.div>
+					<motion.div variants={buttonVariants}>
+						<FocusableButton
+							id="menu-continue"
+							group="menu"
+							order={1}
+							disabled={!savedGameTime}
+							startIcon={<RotateLeftIcon/>}
+							onClick={handleContinue}
+						>
+							Continue {!!savedGameTime && <FormattedTime label=" - " value={savedGameTime} />}
+						</FocusableButton>
+					</motion.div>
+					<motion.div variants={buttonVariants}>
+						<FocusableButton
+							id="menu-new-game"
+							group="menu"
+							order={2}
+							startIcon={<PlayArrowIcon />}
+							onClick={handleNewGame}
+						>
+							New Game
+						</FocusableButton>
+					</motion.div>
+					<motion.div variants={buttonVariants}>
+						<FocusableButton
+							id="menu-multiplayer"
+							group="menu"
+							order={3}
+							startIcon={<GroupsIcon />}
+							onClick={handleMultiplayer}
+						>
+							Local Multiplayer
+						</FocusableButton>
+					</motion.div>
+					{showLeaderboard && (
+						<motion.div variants={buttonVariants}>
+							<FocusableButton
+								id="menu-leaderboard"
+								group="menu"
+								order={4}
+								startIcon={<LeaderboardIcon />}
+								onClick={handleLeaderboard}
+							>
+								Leaderboards
+							</FocusableButton>
+						</motion.div>
+					)}
+					<motion.div variants={buttonVariants}>
+						<FocusableButton
+							id="menu-tutorial"
+							group="menu"
+							order={showLeaderboard ? 5 : 4}
+							startIcon={<SchoolIcon />}
+							onClick={handleTutorial}
+						>
+							Tutorial
+						</FocusableButton>
+					</motion.div>
+					<motion.div variants={buttonVariants}>
+						<FocusableButton
+							id="menu-how-to-play"
+							group="menu"
+							order={showLeaderboard ? 6 : 5}
+							startIcon={<QuestionMarkIcon />}
+							onClick={handleHowToPlay}
+						>
+							How to Play
+						</FocusableButton>
+					</motion.div>
+					<motion.div variants={buttonVariants}>
+						<FocusableButton
+							id="menu-about"
+							group="menu"
+							order={showLeaderboard ? 7 : 6}
+							startIcon={<InfoIcon />}
+							onClick={handleAbout}
+						>
+							About
+						</FocusableButton>
+					</motion.div>
+				</Box>
+			</motion.div>
+		</Box>
+	);
+
 	return (
 		<motion.div
 			initial={{ opacity: needsFadeIn ? 0 : 1 }}
@@ -370,176 +551,31 @@ export default function Landing() {
 			} : undefined}
 		>
 		<Container sx={{textAlign: 'center'}}>
-			<Box
-				ref={containerRef}
-				paddingTop={10}
-				height={200}
-				display="flex"
-				justifyContent="center"
-				gap={2}
-			>
-				{demoCards.map((card, index) => {
-				const staticAnimations = demoCardAnimations[index];
-				if (!staticAnimations) return null;
-
-				const animate = prefersReducedMotion || phase === 'waiting'
-					? undefined
-					: phase === 'matched'
-						? matchedAnimation(measuredOffsets[index] ?? 0)
-						: staticAnimations[phase];
-
-				return (
-					<motion.div
-						data-demo-card={index}
-						key={`${card.color}-${card.shape}-${card.fill}-${card.count}-${index}`}
-						initial={prefersReducedMotion ? false : demoCardInitial}
-						animate={animate}
-					>
-						<PlayingCard
-							width={CARD_WIDTH}
-							card={card}
-							raised={(isSelecting && index < selectedCount) || isMatched}
-							spin={isMatched}
-							flipped={isMatched}
-						/>
-					</motion.div>
-				);
-				})}
-			</Box>
-			<Box paddingY={7}>
-				<motion.div
-					variants={titleContainerVariants}
-					initial={initialState}
-					animate={splashComplete ? 'visible' : initialState}
+			{useSideLayout ? (
+				<Box
+					display="flex"
+					alignItems="center"
+					justifyContent="center"
+					gap={6}
+					minHeight="100vh"
 				>
-					<Typography
-						fontWeight={100}
-						variant="h1"
-						fontSize={40}
-						sx={prefersReducedMotion ? {} : shimmerSx}
-					>
-						{titleSegments.flatMap(({ text, italic }, segIndex) =>
-							[...text].map((char, charIndex) => (
-								<motion.span
-									key={`${segIndex}-${charIndex}`}
-									variants={charVariants}
-									style={{
-										fontStyle: italic ? 'italic' : 'normal',
-										display: char === ' ' ? 'inline' : 'inline-block',
-									}}
-								>
-									{char === ' ' ? '\u00A0' : char}
-								</motion.span>
-							))
-						)}
-					</Typography>
-				</motion.div>
-			</Box>
-			<Box
-				display="inline-block"
-				width={300}
-			>
-				<motion.div
-					variants={buttonContainerVariants}
-					initial={initialState}
-					animate={(isPlatformReady && splashComplete) ? 'visible' : initialState}
-				>
-					<Box display="flex" flexDirection="column" gap={2}>
-						<motion.div variants={buttonVariants}>
-							<FocusableButton
-								id="menu-daily"
-								group="menu"
-								order={0}
-								startIcon={<TodayIcon />}
-								onClick={handleDaily}
-								autoFocus={!savedGameTime}
-							>
-								Daily Board{dailyStreak > 0 ? ` (${dailyStreak} day streak)` : ''}
-							</FocusableButton>
-						</motion.div>
-						<motion.div variants={buttonVariants}>
-							<FocusableButton
-								id="menu-continue"
-								group="menu"
-								order={1}
-								disabled={!savedGameTime}
-								startIcon={<RotateLeftIcon/>}
-								onClick={handleContinue}
-							>
-								Continue {!!savedGameTime && <FormattedTime label=" - " value={savedGameTime} />}
-							</FocusableButton>
-						</motion.div>
-						<motion.div variants={buttonVariants}>
-							<FocusableButton
-								id="menu-new-game"
-								group="menu"
-								order={2}
-								startIcon={<PlayArrowIcon />}
-								onClick={handleNewGame}
-							>
-								New Game
-							</FocusableButton>
-						</motion.div>
-						<motion.div variants={buttonVariants}>
-							<FocusableButton
-								id="menu-multiplayer"
-								group="menu"
-								order={3}
-								startIcon={<GroupsIcon />}
-								onClick={handleMultiplayer}
-							>
-								Local Multiplayer
-							</FocusableButton>
-						</motion.div>
-						{showLeaderboard && (
-							<motion.div variants={buttonVariants}>
-								<FocusableButton
-									id="menu-leaderboard"
-									group="menu"
-									order={4}
-									startIcon={<LeaderboardIcon />}
-									onClick={handleLeaderboard}
-								>
-									Leaderboards
-								</FocusableButton>
-							</motion.div>
-						)}
-						<motion.div variants={buttonVariants}>
-							<FocusableButton
-								id="menu-tutorial"
-								group="menu"
-								order={showLeaderboard ? 5 : 4}
-								startIcon={<SchoolIcon />}
-								onClick={handleTutorial}
-							>
-								Tutorial
-							</FocusableButton>
-						</motion.div>
-						<motion.div variants={buttonVariants}>
-							<FocusableButton
-								id="menu-how-to-play"
-								group="menu"
-								order={showLeaderboard ? 6 : 5}
-								startIcon={<QuestionMarkIcon />}
-								onClick={handleHowToPlay}
-							>
-								How to Play
-							</FocusableButton>
-						</motion.div>
-						<motion.div variants={buttonVariants}>
-							<FocusableButton
-								id="menu-about"
-								group="menu"
-								order={showLeaderboard ? 7 : 6}
-								startIcon={<InfoIcon />}
-								onClick={handleAbout}
-							>
-								About
-							</FocusableButton>
-						</motion.div>
+					<Box flex={1} display="flex" justifyContent="center">
+						<Box textAlign="center">
+							{demoCardsSection}
+							{titleSection}
+						</Box>
 					</Box>
-				</motion.div>
-			</Box>
+					<Box flex={1} display="flex" justifyContent="center">
+						{buttonsSection}
+					</Box>
+				</Box>
+			) : (
+				<>
+					{demoCardsSection}
+					{titleSection}
+					{buttonsSection}
+				</>
+			)}
 			<Dialog open={showFirstTimePrompt} onClose={handlePromptSkip}>
 				<DialogTitle>Welcome!</DialogTitle>
 				<DialogContent>
