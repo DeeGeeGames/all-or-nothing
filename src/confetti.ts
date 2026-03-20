@@ -58,3 +58,50 @@ function fireConvergenceTrails(
 
 	return () => timeouts.forEach(clearTimeout);
 }
+
+const celebrationColors = ['#ffd700', '#ff6b6b', '#4ecdc4', '#45b7d1', '#96e6a1'] as const;
+
+const sideBursts = [
+	{ angle: 60, x: 0 },
+	{ angle: 120, x: 1 },
+] as const;
+
+export
+function fireGameOverConfetti(isPerfect: boolean): () => void {
+	const duration = isPerfect ? 3000 : 1500;
+	const end = Date.now() + duration;
+	const particleCount = isPerfect ? 8 : 4;
+	let rafId = 0;
+
+	const frame = () => {
+		sideBursts.forEach(({ angle, x }) => {
+			confetti({
+				particleCount,
+				angle,
+				spread: 55,
+				origin: { x, y: 0.7 },
+				colors: [...celebrationColors],
+				disableForReducedMotion: true,
+			});
+		});
+
+		if (Date.now() < end) {
+			rafId = requestAnimationFrame(frame);
+		}
+	};
+
+	confetti({
+		particleCount: isPerfect ? 150 : 80,
+		spread: 100,
+		origin: { x: 0.5, y: 0.4 },
+		colors: [...celebrationColors],
+		startVelocity: 45,
+		gravity: 0.8,
+		ticks: 100,
+		disableForReducedMotion: true,
+	});
+
+	rafId = requestAnimationFrame(frame);
+
+	return () => cancelAnimationFrame(rafId);
+}

@@ -4,7 +4,7 @@ import { useAnimatedNumber } from '@/useAnimatedNumber';
 import { useIsPaused, useSetIsPaused } from '@/atoms';
 import { Card, ScorePopup, createScorePopup } from '@/types';
 import AdLinkSection from '@/components/ad-link-section';
-import GameOverDialog from './game-over-dialog';
+import GameOverOverlay from './game-over-overlay';
 import {
 	discardCards,
 	getMismatchedAttributes,
@@ -236,7 +236,7 @@ function GamePlayArea() {
 				canShuffle={canShuffle}
 				onReshuffle={handleReshuffle}
 			/>
-			<GameOverDialog
+			<GameOverOverlay
 				remainingCards={dealtCards.length}
 				isGameOver={gameComplete}
 				time={time}
