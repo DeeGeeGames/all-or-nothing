@@ -79,12 +79,12 @@ export default function SplashSequence() {
 		if (phaseRef.current === 'fade-in') {
 			const elapsed = (Date.now() - fadeStartRef.current) / 1000;
 			const fraction = Math.min(elapsed / FADE_SECONDS, 1);
-			beginFadeOut(Math.max(fraction * FADE_SECONDS, 0.15));
+			beginFadeOut(Math.max((fraction * FADE_SECONDS) / 2, 0.15));
 			return;
 		}
 
 		if (phaseRef.current === 'hold') {
-			beginFadeOut(FADE_SECONDS);
+			beginFadeOut(FADE_SECONDS / 2);
 		}
 	}, [beginFadeOut]);
 
