@@ -20,6 +20,7 @@ import {
 	School as SchoolIcon,
 	Groups as GroupsIcon,
 	Today as TodayIcon,
+	ExitToApp as ExitToAppIcon,
 } from '@mui/icons-material';
 import {
 	Container,
@@ -314,6 +315,10 @@ export default function Landing() {
 		setActiveScreen(Screens.About);
 	}, [setActiveScreen]);
 
+	const handleQuit = useCallback(() => {
+		window.electronAPI?.quit();
+	}, []);
+
 	const handlePromptSkip = useCallback(async () => {
 		setShowFirstTimePrompt(false);
 		localStorage.setItem(TutorialCompletedKey, '1');
@@ -534,6 +539,19 @@ export default function Landing() {
 							About
 						</FocusableButton>
 					</motion.div>
+					{!!window.electronAPI && (
+						<motion.div variants={buttonVariants}>
+							<FocusableButton
+								id="menu-quit"
+								group="menu"
+								order={showLeaderboard ? 8 : 7}
+								startIcon={<ExitToAppIcon />}
+								onClick={handleQuit}
+							>
+								Quit to Desktop
+							</FocusableButton>
+						</motion.div>
+					)}
 				</Box>
 			</motion.div>
 		</Box>

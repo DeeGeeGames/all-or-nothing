@@ -42,6 +42,7 @@ interface ElectronSteamAPI {
 
 interface ElectronAPI {
 	readonly platform: 'electron';
+	readonly quit: () => void;
 	readonly steam: ElectronSteamAPI;
 }
 

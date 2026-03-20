@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu } from 'electron';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { registerSteamHandlers } from './steam-handlers';
@@ -32,6 +32,8 @@ function createWindow() {
 		win.loadFile(join(__dirname, '../dist/web/index.html'));
 	}
 }
+
+ipcMain.on('app:quit', () => app.quit());
 
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => app.quit());
