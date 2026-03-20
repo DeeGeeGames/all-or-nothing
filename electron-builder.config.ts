@@ -1,6 +1,9 @@
 import type { Configuration } from 'electron-builder';
-import { rm } from 'fs/promises';
-import { join } from 'path';
+import { copyFile, rm } from 'fs/promises';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const steamDirsToRemove: Readonly<Record<'linux' | 'win32' | 'darwin', readonly string[]>> = {
 	linux: ['osx', 'win64'],
@@ -24,6 +27,7 @@ const config: Configuration = {
 	linux: {
 		target: ['AppImage', 'flatpak'],
 		category: 'Game',
+		executableArgs: ['--no-sandbox'],
 	},
 	flatpak: {
 		runtimeVersion: '24.08',
@@ -50,6 +54,9 @@ const config: Configuration = {
 		await Promise.all([
 			rm(join(appOutDir, 'LICENSES.chromium.html'), { force: true }),
 			...dirsToRemove.map(dir => rm(join(steamBase, dir), { recursive: true, force: true })),
+			...(electronPlatformName === 'linux'
+				? [copyFile(join(__dirname, 'electron', 'launch.sh'), join(appOutDir, 'launch.sh'))]
+				: []),
 		]);
 	},
 };

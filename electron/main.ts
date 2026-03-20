@@ -1,30 +1,7 @@
 import { app, BrowserWindow, Menu } from 'electron';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { readdirSync } from 'fs';
 import { registerSteamHandlers } from './steam-handlers';
-
-function needsX11Fallback(): boolean {
-	if (process.platform !== 'linux') return false;
-	if (process.argv.includes('--ozone-platform=x11')) return false;
-	try {
-		return readdirSync('/proc/driver/nvidia').length > 0;
-	} catch {
-		return false;
-	}
-}
-
-if (needsX11Fallback()) {
-	app.relaunch({ args: [...process.argv.slice(1), '--ozone-platform=x11'] });
-	app.exit(0);
-}
-
-// The SUID sandbox (chrome-sandbox) requires root ownership and mode 4755,
-// which isn't feasible in containerized environments (Flatpak, Steam Linux Runtime, etc.).
-// Chromium's namespace sandbox and site isolation remain active.
-if (process.platform === 'linux') {
-	app.commandLine.appendSwitch('no-sandbox');
-}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
