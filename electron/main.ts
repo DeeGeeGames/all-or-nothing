@@ -17,6 +17,8 @@ function createWindow() {
 		minWidth: 1280,
 		minHeight: 800,
 		title: 'All or Nothing',
+		backgroundColor: '#000000',
+		show: false,
 		webPreferences: {
 			preload: join(__dirname, 'preload.mjs'),
 			contextIsolation: true,
@@ -25,6 +27,7 @@ function createWindow() {
 	});
 
 	win.setAspectRatio(16 / 10);
+	win.once('ready-to-show', () => win.show());
 
 	if (process.env['VITE_DEV_SERVER_URL']) {
 		win.loadURL(process.env['VITE_DEV_SERVER_URL']);
