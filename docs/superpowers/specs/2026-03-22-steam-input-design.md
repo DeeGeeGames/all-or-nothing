@@ -32,18 +32,21 @@ No analog actions. Stick-based navigation is configured as digital actions in th
 
 ### Main Process Polling (`electron/steam-handlers.ts`)
 
+**Accessing the `input` namespace:** The `steamworks.js` `input` functions are called as direct imports from the module namespace (e.g., `import('steamworks.js').then(sw => sw.input.init())`), not through the `SteamClient` interface used for leaderboards. The existing `SteamClient` interface is not extended.
+
 **Lifecycle:**
 - `steam:initInput` IPC handler — called after `steam:init` succeeds. Calls `input.init()`, resolves the action set handle via `input.getActionSet('GameControls')` and all digital action handles via `input.getDigitalAction()`. Stores handles in module state.
-- A `setInterval` poll loop at ~60Hz (16ms) reads controller state and sends changed actions to the renderer via `webContents.send('steam:inputEvent', ...)`.
+- A `setInterval` poll loop at ~60Hz (16ms) reads controller state and sends changed actions to the renderer via `webContents.send('steam:inputEvent', ...)`. The 16ms interval is not vsync-aligned like `requestAnimationFrame` in the renderer, but this is acceptable for rising-edge detection on a card game.
 - `steam:shutdownInput` IPC handler — stops the poll loop, calls `input.shutdown()`.
+- `input.shutdown()` is best-effort on app close — Steam cleans up on process exit. A `before-quit` handler in `electron/main.ts` calls `input.shutdown()` directly from the main process as a safety net, since React effect cleanups are not guaranteed to run on window close.
 
 **Polling logic:**
-- Each tick: call `input.getControllers()`, for each controller call `isDigitalActionPressed()` on each action handle.
-- Track previous pressed state per controller handle to detect rising edges (just pressed).
-- On rising edge, send `{ action, controllerType }` to the renderer.
+- Each tick: call `input.getControllers()`. For each controller, call `controller.activateActionSet(gameControlsHandle)` (idempotent and cheap — ensures newly connected controllers are immediately active) and then call `isDigitalActionPressed()` on each action handle.
+- Track previous pressed state per controller handle to detect rising edges (just pressed). Prune stale entries from the previous-state map when a controller handle is no longer in the `getControllers()` result, preventing a minor memory leak on repeated connect/disconnect cycles.
+- On rising edge, send `{ action: InputAction, controllerType: ControllerType }` to the renderer. Both are string constants that serialize naturally over IPC.
 - Map `steamworks.js` `InputType` to the existing `ControllerType` enum values (see mapping table below).
 
-**Why poll:** The Steam Input API is poll-based with no callback mechanism. 16ms matches the existing `requestAnimationFrame` cadence in `GamepadManager`.
+**Why poll:** The Steam Input API is poll-based with no callback mechanism.
 
 ### Controller Type Mapping
 
@@ -62,18 +65,18 @@ Performed in the main process so the renderer receives `ControllerType` values d
 Expose four new methods on `window.electronAPI.steam`:
 - `initInput(): Promise<boolean>` — wraps `ipcRenderer.invoke('steam:initInput')`
 - `shutdownInput(): Promise<void>` — wraps `ipcRenderer.invoke('steam:shutdownInput')`
-- `onInputEvent(callback): void` — wraps `ipcRenderer.on('steam:inputEvent', ...)`
+- `onInputEvent(callback: (event: { action: string; controllerType: string }) => void): void` — wraps `ipcRenderer.on('steam:inputEvent', ...)`
 - `offInputEvent(): void` — wraps `ipcRenderer.removeAllListeners('steam:inputEvent')`
 
-Type definitions added to `ElectronSteamAPI` in `src/global.d.ts`.
+Type definitions added to `ElectronSteamAPI` in `src/global.d.ts`. The callback receives `{ action: InputAction; controllerType: ControllerType }` (string constants that map directly to the existing enums).
 
 ### Steam Input Manager (`src/input/steam-input-manager.ts`)
 
-New file. Same interface pattern as `GamepadManager`:
+New file. Follows the existing input manager pattern (class-based, matching `GamepadManager` and `KeyboardManager` — the input subsystem uses classes despite the project's general preference for pure functions):
 - `init()` — calls `window.electronAPI.steam.initInput()`, registers the IPC event listener via `onInputEvent()`
 - `destroy()` — calls `steam.shutdownInput()`, removes IPC listener via `offInputEvent()`
 - `addListener(listener)` / `removeListener(listener)` — manages `InputListener` callbacks
-- On receiving `steam:inputEvent`, constructs an `InputEvent` with the action and `ControllerType`, emits to all listeners
+- On receiving `steam:inputEvent` with payload `{ action: InputAction, controllerType: ControllerType }`, constructs an `InputEvent` and emits to all listeners
 
 ### Input Hooks (`src/input/input-hooks.ts`)
 
@@ -84,12 +87,13 @@ New file. Same interface pattern as `GamepadManager`:
 
 **Gamepad manager gating:**
 - Module-level boolean `steamInputActive` (set to `true` when `SteamInputManager.init()` succeeds)
-- `useGamepadManager` checks this flag — if `true`, skips `GamepadManager.init()`, preventing raw Gamepad API polling
+- `useGamepadManager` checks this flag lazily inside its `useEffect` — if `true` at the time the effect runs, skips `GamepadManager.init()`, preventing raw Gamepad API polling
+- Since `SteamInputManager.init()` is async (IPC round-trip), `steamInputActive` may not be `true` on the first render. `useGamepadManager`'s effect should re-check the flag, and if Steam Input activates later, the gamepad manager should be destroyed at that point
 - This is the fix for the double-input bug
 
 ### App Wiring (`src/app.tsx`)
 
-Add `useSteamInputManager(handleInput)` alongside the existing `useGamepadManager(handleInput)` and `useKeyboardManager(handleInput)` calls. The same `handleInput` function processes all input sources identically since they all produce `InputEvent` objects.
+Add `useSteamInputManager(handleInput)` before the existing `useGamepadManager(handleInput)` and `useKeyboardManager(handleInput)` calls. Hook call order matters — `useSteamInputManager` must be first so its async init can set the `steamInputActive` flag before `useGamepadManager` checks it (though the lazy check handles the race if the flag isn't set yet). The same `handleInput` function processes all input sources identically since they all produce `InputEvent` objects.
 
 ## File Changes
 
