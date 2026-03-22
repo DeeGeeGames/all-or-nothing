@@ -26,6 +26,7 @@ jobs:
       - run: npm run build
         env:
           VITE_BASE: ${{ matrix.vite_base }}
+          VITE_GOOGLE_ANALYTICS_ID: ${{ matrix.artifact_name == 'web-dist' && secrets.GOOGLE_ANALYTICS_ID || '' }}
       - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}
