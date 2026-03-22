@@ -38,6 +38,10 @@ interface ElectronSteamAPI {
 	submitScore(data: { score: number; time: number; maxCombo: number }): Promise<boolean>;
 	fetchLeaderboard(options: { leaderboard: string; fetchType: string; rangeStart: number; rangeEnd: number }): Promise<ReadonlyArray<{ rank: number; playerName: string; score: number }>>;
 	getPlayerName(): Promise<string | null>;
+	initInput(): Promise<boolean>;
+	shutdownInput(): Promise<void>;
+	onInputEvent(callback: (event: { action: string; controllerType: string }) => void): void;
+	offInputEvent(): void;
 }
 
 interface ElectronAPI {
