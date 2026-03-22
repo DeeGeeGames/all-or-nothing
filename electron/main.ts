@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu } from 'electron';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { registerSteamHandlers } from './steam-handlers';
+import { registerSteamHandlers, setSteamInputWindow, shutdownSteamInput } from './steam-handlers';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -26,6 +26,7 @@ function createWindow() {
 		},
 	});
 
+	setSteamInputWindow(win);
 	win.setAspectRatio(16 / 10);
 	win.once('ready-to-show', () => win.show());
 
@@ -40,3 +41,6 @@ ipcMain.on('app:quit', () => app.quit());
 
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => app.quit());
+app.on('before-quit', () => {
+	shutdownSteamInput();
+});
