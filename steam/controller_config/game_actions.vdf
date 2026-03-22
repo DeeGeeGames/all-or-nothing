@@ -1,0 +1,80 @@
+"In Game Actions"
+{
+	"actions"
+	{
+		"GameControls"
+		{
+			"title"		"#Set_GameControls"
+			"StickPadGyro"
+			{
+			}
+			"AnalogTrigger"
+			{
+			}
+			"Button"
+			{
+				"select"
+				{
+					"title"		"#Action_select"
+					"input_mode"	"button"
+				}
+				"back"
+				{
+					"title"		"#Action_back"
+					"input_mode"	"button"
+				}
+				"hint"
+				{
+					"title"		"#Action_hint"
+					"input_mode"	"button"
+				}
+				"shuffle"
+				{
+					"title"		"#Action_shuffle"
+					"input_mode"	"button"
+				}
+				"pause"
+				{
+					"title"		"#Action_pause"
+					"input_mode"	"button"
+				}
+				"navigate_up"
+				{
+					"title"		"#Action_navigate_up"
+					"input_mode"	"button"
+				}
+				"navigate_down"
+				{
+					"title"		"#Action_navigate_down"
+					"input_mode"	"button"
+				}
+				"navigate_left"
+				{
+					"title"		"#Action_navigate_left"
+					"input_mode"	"button"
+				}
+				"navigate_right"
+				{
+					"title"		"#Action_navigate_right"
+					"input_mode"	"button"
+				}
+			}
+		}
+	}
+	"localization"
+	{
+		"english"
+		{
+			"Set_GameControls"		"Game Controls"
+			"Action_select"			"Select / Confirm"
+			"Action_back"			"Back / Cancel"
+			"Action_hint"			"Show Hint"
+			"Action_shuffle"		"Shuffle Deck"
+			"Action_pause"			"Pause"
+			"Action_navigate_up"		"Navigate Up"
+			"Action_navigate_down"		"Navigate Down"
+			"Action_navigate_left"		"Navigate Left"
+			"Action_navigate_right"		"Navigate Right"
+		}
+	}
+}
