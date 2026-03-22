@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { getGamepadManager } from './gamepad-manager';
 import { getKeyboardManager } from './keyboard-manager';
+import { getSteamInputManager } from './steam-input-manager';
 import { InputEvent } from './input-types';
 
 type InputListener = (event: InputEvent) => void;
@@ -9,47 +10,108 @@ type InputListener = (event: InputEvent) => void;
 // These track how many components are using each manager
 let gamepadInitCount = 0;
 let keyboardInitCount = 0;
+let steamInputInitCount = 0;
+let steamInputActive = false;
+
+// Callbacks to notify all useGamepadManager consumers when Steam Input activates
+const steamInputActivatedCallbacks: Set<() => void> = new Set();
 
 /**
- * Hook to manage gamepad input with automatic lifecycle handling.
- * Handles init/destroy and listener registration/cleanup.
- * Safe to use in multiple components via reference counting.
+ * Hook to manage Steam Input with automatic lifecycle handling.
+ * Only activates in Electron/Steam environments. No-op in web/PWA builds.
+ * Must be called before useGamepadManager in the component tree.
  *
- * @param listener - Callback function to receive gamepad input events
+ * @param listener - Callback function to receive Steam Input events
  */
 export
-function useGamepadManager(listener: InputListener): void {
-	// Store listener in ref to allow changes without re-initialization
+function useSteamInputManager(listener: InputListener): void {
 	const listenerRef = useRef(listener);
 
-	// Update ref when listener changes (no effect re-run needed)
 	useEffect(() => {
 		listenerRef.current = listener;
 	}, [listener]);
 
-	// Create stable callback that uses the ref
 	const stableListener = useCallback((event: InputEvent) => {
 		listenerRef.current(event);
 	}, []);
 
 	useEffect(() => {
+		// No-op in non-Electron environments
+		if (!window.electronAPI) return;
+
+		const manager = getSteamInputManager();
+
+		if (!steamInputInitCount) {
+			manager.init().then(success => {
+				if (success) {
+					steamInputActive = true;
+					steamInputActivatedCallbacks.forEach(cb => cb());
+					steamInputActivatedCallbacks.clear();
+				}
+			});
+		}
+
+		steamInputInitCount++;
+		manager.addListener(stableListener);
+
+		return () => {
+			manager.removeListener(stableListener);
+			steamInputInitCount--;
+
+			if (!steamInputInitCount) {
+				manager.destroy();
+				steamInputActive = false;
+			}
+		};
+	}, [stableListener]);
+}
+
+/**
+ * Hook to manage gamepad input with automatic lifecycle handling.
+ * Handles init/destroy and listener registration/cleanup.
+ * Safe to use in multiple components via reference counting.
+ * Automatically disabled when Steam Input is active to prevent double-input.
+ *
+ * @param listener - Callback function to receive gamepad input events
+ */
+export
+function useGamepadManager(listener: InputListener): void {
+	const listenerRef = useRef(listener);
+
+	useEffect(() => {
+		listenerRef.current = listener;
+	}, [listener]);
+
+	const stableListener = useCallback((event: InputEvent) => {
+		listenerRef.current(event);
+	}, []);
+
+	useEffect(() => {
+		// Skip if Steam Input is already active
+		if (steamInputActive) return;
+
 		const manager = getGamepadManager();
 
-		// Only init on first consumer to avoid duplicate event listeners
 		if (!gamepadInitCount) manager.init();
 
 		gamepadInitCount++;
 
 		manager.addListener(stableListener);
 
-		return () => {
+		// If Steam Input activates later, tear down this consumer's gamepad listener
+		const teardown = () => {
 			manager.removeListener(stableListener);
 			gamepadInitCount--;
-
-			// Only destroy when last consumer unmounts
 			if (!gamepadInitCount) manager.destroy();
 		};
-	}, [stableListener]); // Only depends on stable callback
+
+		steamInputActivatedCallbacks.add(teardown);
+
+		return () => {
+			steamInputActivatedCallbacks.delete(teardown);
+			teardown();
+		};
+	}, [stableListener]);
 }
 
 /**
