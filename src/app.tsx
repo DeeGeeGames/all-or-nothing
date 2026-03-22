@@ -8,7 +8,7 @@ import TitleScreen from './components/screens/title-screen';
 import { Screens } from './types';
 import { lazy, Suspense, useMemo, useEffect, useLayoutEffect } from 'react';
 import Loader from './components/loader';
-import { useGamepadManager, useKeyboardManager } from './input/input-hooks';
+import { useGamepadManager, useKeyboardManager, useSteamInputManager } from './input/input-hooks';
 import { useEventListener } from 'usehooks-ts';
 import { InputEvent, NavigationDirection, PrimaryInputAction } from './input/input-types';
 import { isIn } from './utils';
@@ -81,6 +81,7 @@ function App() {
 		[PrimaryInputAction.SELECT]: () => selectCurrent(),
 	} as const), [navigate, selectCurrent]);
 
+	useSteamInputManager(handleInput);
 	useGamepadManager(handleInput);
 	useKeyboardManager(handleInput);
 	useEventListener('mousedown', handleMouseOrTouch);
