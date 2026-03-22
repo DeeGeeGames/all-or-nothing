@@ -1,4 +1,4 @@
-import { ipcMain, app } from 'electron';
+import { ipcMain, app, type BrowserWindow } from 'electron';
 import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 
@@ -30,6 +30,46 @@ const FETCH_TYPE_MAP = {
 	friends: 'Friends',
 } as const;
 
+const STEAM_ACTION_NAMES = [
+	'select',
+	'back',
+	'hint',
+	'shuffle',
+	'pause',
+	'navigate_up',
+	'navigate_down',
+	'navigate_left',
+	'navigate_right',
+] as const;
+
+const STEAM_ACTION_TO_INPUT_ACTION: Record<string, string> = {
+	select: 'SELECT',
+	back: 'BACK',
+	hint: 'HINT',
+	shuffle: 'SHUFFLE',
+	pause: 'PAUSE',
+	navigate_up: 'NAVIGATE_UP',
+	navigate_down: 'NAVIGATE_DOWN',
+	navigate_left: 'NAVIGATE_LEFT',
+	navigate_right: 'NAVIGATE_RIGHT',
+};
+
+function mapSteamInputType(inputType: string): string {
+	const mapping: Record<string, string> = {
+		XBox360Controller: 'xbox',
+		XBoxOneController: 'xbox',
+		PS3Controller: 'playstation',
+		PS4Controller: 'playstation',
+		PS5Controller: 'playstation',
+		SwitchJoyConPair: 'switch',
+		SwitchJoyConSingle: 'switch',
+		SwitchProController: 'switch',
+		SteamController: 'steamdeck',
+		SteamDeckController: 'steamdeck',
+	};
+	return mapping[inputType] ?? 'generic';
+}
+
 interface SteamClient {
 	leaderboard: {
 		uploadScore(name: string, score: number, sortMethod: string): Promise<boolean>;
@@ -46,13 +86,90 @@ interface SteamClient {
 
 let steamClient: SteamClient | null = null;
 
+// Steam Input state — uses mutable Maps for performance (polled at 60Hz)
+type SteamworksClient = Omit<import('steamworks.js').Client, 'init' | 'runCallbacks'>;
+let steamworksClient: SteamworksClient | null = null;
+let inputPollInterval: ReturnType<typeof setInterval> | null = null;
+let actionSetHandle: bigint | null = null;
+let digitalActionHandles: ReadonlyArray<{ name: string; handle: bigint }> = [];
+const previousStates: Map<bigint, Map<string, boolean>> = new Map();
+let mainWindow: BrowserWindow | null = null;
+
+export function setSteamInputWindow(win: BrowserWindow): void {
+	mainWindow = win;
+}
+
+function pollSteamInput(): void {
+	if (!steamworksClient || !actionSetHandle || !mainWindow) return;
+
+	// Assign to local consts after the null guard so TypeScript narrows
+	// inside the forEach callbacks without needing non-null assertions
+	const setHandle = actionSetHandle;
+	const win = mainWindow;
+
+	const controllers = steamworksClient.input.getControllers();
+	const currentHandles = new Set<bigint>();
+
+	controllers.forEach(controller => {
+		const handle = controller.getHandle();
+		currentHandles.add(handle);
+		controller.activateActionSet(setHandle);
+
+		const prevButtonStates = previousStates.get(handle) ?? new Map<string, boolean>();
+		const controllerType = mapSteamInputType(controller.getType());
+
+		digitalActionHandles.forEach(({ name, handle: actionHandle }) => {
+			const pressed = controller.isDigitalActionPressed(actionHandle);
+			const wasPressed = prevButtonStates.get(name) ?? false;
+
+			if (pressed && !wasPressed) {
+				const action = STEAM_ACTION_TO_INPUT_ACTION[name];
+				if (action) {
+					win.webContents.send('steam:inputEvent', {
+						action,
+						controllerType,
+					});
+				}
+			}
+
+			prevButtonStates.set(name, pressed);
+		});
+
+		previousStates.set(handle, prevButtonStates);
+	});
+
+	// Prune stale controller entries
+	previousStates.forEach((_, handle) => {
+		if (!currentHandles.has(handle)) {
+			previousStates.delete(handle);
+		}
+	});
+}
+
+export function shutdownSteamInput(): void {
+	if (inputPollInterval) {
+		clearInterval(inputPollInterval);
+		inputPollInterval = null;
+	}
+	previousStates.clear();
+	if (steamworksClient) {
+		try {
+			steamworksClient.input.shutdown();
+		} catch {
+			// Best-effort — Steam cleans up on process exit
+		}
+	}
+}
+
 export function registerSteamHandlers(appId: number) {
 	ipcMain.handle('steam:init', async () => {
 		if (!isSteamEnvironment()) return false;
 
 		try {
 			const steamworks = await import('steamworks.js');
-			steamClient = steamworks.init(appId) as unknown as SteamClient;
+			const client = steamworks.init(appId);
+			steamworksClient = client;
+			steamClient = client as unknown as SteamClient;
 			return true;
 		} catch {
 			return false;
@@ -100,5 +217,28 @@ export function registerSteamHandlers(appId: number) {
 		} catch {
 			return null;
 		}
+	});
+
+	ipcMain.handle('steam:initInput', () => {
+		if (!steamworksClient) return false;
+		try {
+			const sw = steamworksClient;
+			sw.input.init();
+
+			actionSetHandle = sw.input.getActionSet('GameControls');
+			digitalActionHandles = STEAM_ACTION_NAMES.map(name => ({
+				name,
+				handle: sw.input.getDigitalAction(name),
+			}));
+
+			inputPollInterval = setInterval(pollSteamInput, 16);
+			return true;
+		} catch {
+			return false;
+		}
+	});
+
+	ipcMain.handle('steam:shutdownInput', () => {
+		shutdownSteamInput();
 	});
 }
