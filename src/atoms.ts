@@ -91,6 +91,18 @@ function useSetForcedPlatform() {
 	return useSetAtom(forcedPlatformAtom);
 }
 
+const steamGlyphMapAtom = atom<Readonly<Record<string, string>> | null>(null);
+
+export
+function useSteamGlyphMap() {
+	return useAtomValue(steamGlyphMapAtom);
+}
+
+export
+function useSetSteamGlyphMap() {
+	return useSetAtom(steamGlyphMapAtom);
+}
+
 const pausedAtom = atom(false);
 
 const activeScreenAtom = atom<Screens>(Screens.Splash);
