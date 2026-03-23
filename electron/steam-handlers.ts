@@ -1,7 +1,7 @@
 import { ipcMain, app, type BrowserWindow } from 'electron';
 import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
-import SteamworksSDK, { SteamInputType, LeaderboardSortMethod, LeaderboardDisplayType, LeaderboardDataRequest, LeaderboardUploadScoreMethod } from 'steamworks-ffi-node';
+import { SteamworksSDK, SteamInputType, LeaderboardSortMethod, LeaderboardDisplayType, LeaderboardDataRequest, LeaderboardUploadScoreMethod } from 'steamworks-ffi-node';
 
 const steam = SteamworksSDK.getInstance();
 let steamInitialized = false;
