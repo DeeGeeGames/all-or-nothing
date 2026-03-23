@@ -1,7 +1,7 @@
 import { ipcMain, app, type BrowserWindow } from 'electron';
 import { existsSync } from 'fs';
 import { join, dirname } from 'path';
-import SteamworksSDK from 'steamworks-ffi-node';
+import SteamworksSDK, { SteamInputType } from 'steamworks-ffi-node';
 
 const steam = SteamworksSDK.getInstance();
 let steamInitialized = false;
@@ -58,18 +58,18 @@ const STEAM_ACTION_TO_INPUT_ACTION: Record<string, string> = {
 	navigate_right: 'NAVIGATE_RIGHT',
 };
 
-function mapSteamInputType(inputType: string): string {
-	const mapping: Record<string, string> = {
-		XBox360Controller: 'xbox',
-		XBoxOneController: 'xbox',
-		PS3Controller: 'playstation',
-		PS4Controller: 'playstation',
-		PS5Controller: 'playstation',
-		SwitchJoyConPair: 'switch',
-		SwitchJoyConSingle: 'switch',
-		SwitchProController: 'switch',
-		SteamController: 'steamdeck',
-		SteamDeckController: 'steamdeck',
+function mapSteamInputType(inputType: SteamInputType): string {
+	const mapping: Partial<Record<SteamInputType, string>> = {
+		[SteamInputType.XBox360Controller]: 'xbox',
+		[SteamInputType.XBoxOneController]: 'xbox',
+		[SteamInputType.PS3Controller]: 'playstation',
+		[SteamInputType.PS4Controller]: 'playstation',
+		[SteamInputType.PS5Controller]: 'playstation',
+		[SteamInputType.SwitchJoyConPair]: 'switch',
+		[SteamInputType.SwitchJoyConSingle]: 'switch',
+		[SteamInputType.SwitchProController]: 'switch',
+		[SteamInputType.SteamController]: 'steamdeck',
+		[SteamInputType.SteamDeckController]: 'steamdeck',
 	};
 	return mapping[inputType] ?? 'generic';
 }
@@ -86,26 +86,24 @@ export function setSteamInputWindow(win: BrowserWindow): void {
 }
 
 function pollSteamInput(): void {
-	if (!steamworksClient || !actionSetHandle || !mainWindow) return;
+	if (!steamInitialized || !actionSetHandle || !mainWindow) return;
 
 	// Assign to local consts after the null guard so TypeScript narrows
 	// inside the forEach callbacks without needing non-null assertions
 	const setHandle = actionSetHandle;
 	const win = mainWindow;
 
-	const controllers = steamworksClient.input.getControllers();
-	const currentHandles = new Set<bigint>();
+	const controllerHandles = steam.input.getConnectedControllers();
+	const currentHandles = new Set(controllerHandles);
 
-	controllers.forEach(controller => {
-		const handle = controller.getHandle();
-		currentHandles.add(handle);
-		controller.activateActionSet(setHandle);
+	controllerHandles.forEach(handle => {
+		steam.input.activateActionSet(handle, setHandle);
 
 		const prevButtonStates = previousStates.get(handle) ?? new Map<string, boolean>();
-		const controllerType = mapSteamInputType(controller.getType());
+		const controllerType = mapSteamInputType(steam.input.getInputTypeForHandle(handle));
 
 		digitalActionHandles.forEach(({ name, handle: actionHandle }) => {
-			const pressed = controller.isDigitalActionPressed(actionHandle);
+			const { state: pressed } = steam.input.getDigitalActionData(handle, actionHandle);
 			const wasPressed = prevButtonStates.get(name) ?? false;
 
 			if (pressed && !wasPressed) {
@@ -206,15 +204,14 @@ export function registerSteamHandlers(appId: number) {
 	});
 
 	ipcMain.handle('steam:initInput', () => {
-		if (!steamworksClient) return false;
+		if (!steamInitialized) return false;
 		try {
-			const sw = steamworksClient;
-			sw.input.init();
+			steam.input.init();
 
-			actionSetHandle = sw.input.getActionSet('GameControls');
+			actionSetHandle = steam.input.getActionSetHandle('GameControls');
 			digitalActionHandles = STEAM_ACTION_NAMES.map(name => ({
 				name,
-				handle: sw.input.getDigitalAction(name),
+				handle: steam.input.getDigitalActionHandle(name),
 			}));
 
 			inputPollInterval = setInterval(pollSteamInput, 16);
