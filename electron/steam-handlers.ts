@@ -1,5 +1,5 @@
 import { ipcMain, app, type BrowserWindow } from 'electron';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import SteamworksSDK, { SteamInputType, LeaderboardSortMethod, LeaderboardDisplayType, LeaderboardDataRequest, LeaderboardUploadScoreMethod } from 'steamworks-ffi-node';
 
@@ -79,7 +79,41 @@ let inputPollInterval: ReturnType<typeof setInterval> | null = null;
 let actionSetHandle: bigint | null = null;
 let digitalActionHandles: ReadonlyArray<{ name: string; handle: bigint }> = [];
 const previousStates: Map<bigint, Map<string, boolean>> = new Map();
+const resolvedGlyphControllers: Set<bigint> = new Set();
 let mainWindow: BrowserWindow | null = null;
+
+function resolveGlyphs(): Record<string, string> | null {
+	if (!actionSetHandle) return null;
+
+	const controllers = steam.input.getConnectedControllers();
+	const controller = controllers[0];
+	if (!controller) return null;
+
+	const setHandle = actionSetHandle;
+
+	const entries = digitalActionHandles
+		.map(({ name, handle: actionHandle }) => {
+			const action = STEAM_ACTION_TO_INPUT_ACTION[name];
+			if (!action) return null;
+
+			const origins = steam.input.getDigitalActionOrigins(controller, setHandle, actionHandle);
+			const origin = origins[0];
+			if (origin === undefined) return null;
+
+			const pngPath = steam.input.getGlyphPNGForActionOrigin(origin, 1, 0); // Medium size, no flags
+			if (!pngPath) return null;
+
+			try {
+				const pngData = readFileSync(pngPath);
+				return [action, `data:image/png;base64,${pngData.toString('base64')}`] as [string, string];
+			} catch {
+				return null;
+			}
+		})
+		.filter((entry): entry is [string, string] => entry !== null);
+
+	return entries.length > 0 ? Object.fromEntries(entries) : null;
+}
 
 export function setSteamInputWindow(win: BrowserWindow): void {
 	mainWindow = win;
@@ -122,10 +156,27 @@ function pollSteamInput(): void {
 		previousStates.set(handle, prevButtonStates);
 	});
 
+	// Resolve glyphs for newly connected controllers
+	controllerHandles.forEach(handle => {
+		if (!resolvedGlyphControllers.has(handle)) {
+			resolvedGlyphControllers.add(handle);
+			const glyphs = resolveGlyphs();
+			if (glyphs) {
+				win.webContents.send('steam:glyphMap', { glyphs });
+			}
+		}
+	});
+
+	if (controllerHandles.length === 0 && resolvedGlyphControllers.size > 0) {
+		resolvedGlyphControllers.clear();
+		win.webContents.send('steam:glyphMap', { glyphs: null });
+	}
+
 	// Prune stale controller entries
 	previousStates.forEach((_, handle) => {
 		if (!currentHandles.has(handle)) {
 			previousStates.delete(handle);
+			resolvedGlyphControllers.delete(handle);
 		}
 	});
 }
@@ -136,6 +187,7 @@ export function shutdownSteamInput(): void {
 		inputPollInterval = null;
 	}
 	previousStates.clear();
+	resolvedGlyphControllers.clear();
 	if (steamInitialized) {
 		try {
 			steam.input.shutdown();
