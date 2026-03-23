@@ -24,7 +24,10 @@ const steamInputActivatedCallbacks: Set<() => void> = new Set();
  * @param listener - Callback function to receive Steam Input events
  */
 export
-function useSteamInputManager(listener: InputListener): void {
+function useSteamInputManager(
+	listener: InputListener,
+	onGlyphs?: (glyphs: Readonly<Record<string, string>> | null) => void,
+): void {
 	const listenerRef = useRef(listener);
 
 	useEffect(() => {
@@ -33,6 +36,16 @@ function useSteamInputManager(listener: InputListener): void {
 
 	const stableListener = useCallback((event: InputEvent) => {
 		listenerRef.current(event);
+	}, []);
+
+	const glyphRef = useRef(onGlyphs);
+
+	useEffect(() => {
+		glyphRef.current = onGlyphs;
+	}, [onGlyphs]);
+
+	const stableGlyphListener = useCallback((glyphs: Readonly<Record<string, string>> | null) => {
+		glyphRef.current?.(glyphs);
 	}, []);
 
 	useEffect(() => {
@@ -53,9 +66,11 @@ function useSteamInputManager(listener: InputListener): void {
 
 		steamInputInitCount++;
 		manager.addListener(stableListener);
+		manager.addGlyphListener(stableGlyphListener);
 
 		return () => {
 			manager.removeListener(stableListener);
+			manager.removeGlyphListener(stableGlyphListener);
 			steamInputInitCount--;
 
 			if (!steamInputInitCount) {
@@ -63,7 +78,7 @@ function useSteamInputManager(listener: InputListener): void {
 				steamInputActive = false;
 			}
 		};
-	}, [stableListener]);
+	}, [stableListener, stableGlyphListener]);
 }
 
 /**

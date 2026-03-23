@@ -5,8 +5,11 @@ import {
 	InputListener,
 } from './input-types';
 
+type GlyphListener = (glyphs: Readonly<Record<string, string>> | null) => void;
+
 export class SteamInputManager {
 	private listeners: InputListener[] = [];
+	private glyphListeners: GlyphListener[] = [];
 	private initialized = false;
 
 	public async init(): Promise<boolean> {
@@ -26,6 +29,10 @@ export class SteamInputManager {
 				this.listeners.forEach(listener => listener(event));
 			});
 
+			api.onGlyphMap((data) => {
+				this.glyphListeners.forEach(listener => listener(data.glyphs));
+			});
+
 			this.initialized = true;
 			return true;
 		} catch {
@@ -37,8 +44,10 @@ export class SteamInputManager {
 		const api = window.electronAPI?.steam;
 		if (api) {
 			api.offInputEvent();
+			api.offGlyphMap();
 			api.shutdownInput();
 		}
+		this.glyphListeners = [];
 		this.listeners = [];
 		this.initialized = false;
 	}
@@ -50,6 +59,16 @@ export class SteamInputManager {
 
 	public removeListener(listener: InputListener): this {
 		this.listeners = this.listeners.filter(l => l !== listener);
+		return this;
+	}
+
+	public addGlyphListener(listener: GlyphListener): this {
+		this.glyphListeners.push(listener);
+		return this;
+	}
+
+	public removeGlyphListener(listener: GlyphListener): this {
+		this.glyphListeners = this.glyphListeners.filter(l => l !== listener);
 		return this;
 	}
 
