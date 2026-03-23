@@ -1,7 +1,7 @@
 import { ipcMain, app, type BrowserWindow } from 'electron';
 import { existsSync } from 'fs';
 import { join, dirname } from 'path';
-import SteamworksSDK, { SteamInputType } from 'steamworks-ffi-node';
+import SteamworksSDK, { SteamInputType, LeaderboardSortMethod, LeaderboardDisplayType, LeaderboardDataRequest, LeaderboardUploadScoreMethod } from 'steamworks-ffi-node';
 
 const steam = SteamworksSDK.getInstance();
 let steamInitialized = false;
@@ -15,23 +15,23 @@ function isSteamEnvironment(): boolean {
 	return existsSync(join(exeDir, 'steam_appid.txt'));
 }
 
-// TODO: Replace with real leaderboard names once a Steam App ID is registered.
-const STEAM_LEADERBOARD_NAMES = {
-	score: 'Highscores',
-	time: 'BestTimes',
-	combo: 'MaxCombo',
-} as const;
+const leaderboardHandles: Map<string, bigint> = new Map();
 
-const SORT_METHODS = {
-	score: 'Descending',
-	time: 'Ascending',
-	combo: 'Descending',
-} as const;
+async function getLeaderboardHandle(name: string, sortMethod: LeaderboardSortMethod, displayType: LeaderboardDisplayType): Promise<bigint | null> {
+	const cached = leaderboardHandles.get(name);
+	if (cached !== undefined) return cached;
 
-const FETCH_TYPE_MAP = {
-	global: 'Global',
-	'around-user': 'GlobalAroundUser',
-	friends: 'Friends',
+	const info = await steam.leaderboards.findOrCreateLeaderboard(name, sortMethod, displayType);
+	if (!info) return null;
+
+	leaderboardHandles.set(name, info.handle);
+	return info.handle;
+}
+
+const STEAM_LEADERBOARDS = {
+	score: { name: 'Highscores', sort: LeaderboardSortMethod.Descending, display: LeaderboardDisplayType.Numeric },
+	time: { name: 'BestTimes', sort: LeaderboardSortMethod.Ascending, display: LeaderboardDisplayType.TimeMilliseconds },
+	combo: { name: 'MaxCombo', sort: LeaderboardSortMethod.Descending, display: LeaderboardDisplayType.Numeric },
 } as const;
 
 const STEAM_ACTION_NAMES = [
@@ -161,13 +161,24 @@ export function registerSteamHandlers(appId: number) {
 	});
 
 	ipcMain.handle('steam:submitScore', async (_event, data: { score: number; time: number; maxCombo: number }) => {
-		if (!steamClient) return false;
+		if (!steamInitialized) return false;
 		try {
-			const results = await Promise.all([
-				steamClient.leaderboard.uploadScore(STEAM_LEADERBOARD_NAMES.score, data.score, SORT_METHODS.score),
-				steamClient.leaderboard.uploadScore(STEAM_LEADERBOARD_NAMES.time, data.time, SORT_METHODS.time),
-				steamClient.leaderboard.uploadScore(STEAM_LEADERBOARD_NAMES.combo, data.maxCombo, SORT_METHODS.combo),
-			]);
+			const entries = [
+				{ key: 'score' as const, value: data.score },
+				{ key: 'time' as const, value: data.time },
+				{ key: 'combo' as const, value: data.maxCombo },
+			];
+
+			const results = await Promise.all(
+				entries.map(async ({ key, value }) => {
+					const lb = STEAM_LEADERBOARDS[key];
+					const handle = await getLeaderboardHandle(lb.name, lb.sort, lb.display);
+					if (!handle) return false;
+					const result = await steam.leaderboards.uploadScore(handle, value, LeaderboardUploadScoreMethod.KeepBest);
+					return result?.success ?? false;
+				})
+			);
+
 			return results.every(Boolean);
 		} catch {
 			return false;
@@ -175,18 +186,28 @@ export function registerSteamHandlers(appId: number) {
 	});
 
 	ipcMain.handle('steam:fetchLeaderboard', async (_event, options: { leaderboard: string; fetchType: string; rangeStart: number; rangeEnd: number }) => {
-		if (!steamClient) return [];
+		if (!steamInitialized) return [];
 		try {
-			const boardKey = options.leaderboard as keyof typeof STEAM_LEADERBOARD_NAMES;
-			const fetchKey = options.fetchType as keyof typeof FETCH_TYPE_MAP;
-			const steamName = STEAM_LEADERBOARD_NAMES[boardKey];
-			const fetchType = FETCH_TYPE_MAP[fetchKey];
-			if (!steamName || !fetchType) return [];
+			const boardKey = options.leaderboard as keyof typeof STEAM_LEADERBOARDS;
+			const lb = STEAM_LEADERBOARDS[boardKey];
+			if (!lb) return [];
 
-			const entries = await steamClient.leaderboard.getScores(steamName, fetchType, options.rangeStart, options.rangeEnd);
+			const fetchTypeMap: Record<string, LeaderboardDataRequest> = {
+				'global': LeaderboardDataRequest.Global,
+				'around-user': LeaderboardDataRequest.GlobalAroundUser,
+				'friends': LeaderboardDataRequest.Friends,
+			};
+			const dataRequest = fetchTypeMap[options.fetchType];
+			if (dataRequest === undefined) return [];
+
+			const handle = await getLeaderboardHandle(lb.name, lb.sort, lb.display);
+			if (!handle) return [];
+
+			const entries = await steam.leaderboards.downloadLeaderboardEntries(handle, dataRequest, options.rangeStart, options.rangeEnd);
+
 			return entries.map(entry => ({
 				rank: entry.globalRank,
-				playerName: entry.steamId.personaName,
+				playerName: entry.steamId,
 				score: entry.score,
 			}));
 		} catch {
@@ -195,9 +216,9 @@ export function registerSteamHandlers(appId: number) {
 	});
 
 	ipcMain.handle('steam:getPlayerName', () => {
-		if (!steamClient) return null;
+		if (!steamInitialized) return null;
 		try {
-			return steamClient.localplayer.getName();
+			return steam.friends.getPersonaName();
 		} catch {
 			return null;
 		}
