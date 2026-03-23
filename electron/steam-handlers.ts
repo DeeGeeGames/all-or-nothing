@@ -5,6 +5,7 @@ import SteamworksSDK, { SteamInputType, LeaderboardSortMethod, LeaderboardDispla
 
 const steam = SteamworksSDK.getInstance();
 let steamInitialized = false;
+let callbackInterval: ReturnType<typeof setInterval> | null = null;
 
 function isSteamEnvironment(): boolean {
 	// Steam sets SteamAppId when launching a game
@@ -33,6 +34,12 @@ const STEAM_LEADERBOARDS = {
 	time: { name: 'BestTimes', sort: LeaderboardSortMethod.Ascending, display: LeaderboardDisplayType.TimeMilliseconds },
 	combo: { name: 'MaxCombo', sort: LeaderboardSortMethod.Descending, display: LeaderboardDisplayType.Numeric },
 } as const;
+
+const FETCH_TYPE_MAP: Readonly<Record<string, LeaderboardDataRequest>> = {
+	'global': LeaderboardDataRequest.Global,
+	'around-user': LeaderboardDataRequest.GlobalAroundUser,
+	'friends': LeaderboardDataRequest.Friends,
+};
 
 const STEAM_ACTION_NAMES = [
 	'select',
@@ -205,7 +212,8 @@ export function registerSteamHandlers(appId: number) {
 			steam.init({ appId });
 			steamInitialized = true;
 			// Required for async operations (leaderboards) to resolve
-			setInterval(() => steam.runCallbacks(), 100);
+			if (callbackInterval) clearInterval(callbackInterval);
+			callbackInterval = setInterval(() => steam.runCallbacks(), 100);
 			return true;
 		} catch {
 			return false;
@@ -244,12 +252,7 @@ export function registerSteamHandlers(appId: number) {
 			const lb = STEAM_LEADERBOARDS[boardKey];
 			if (!lb) return [];
 
-			const fetchTypeMap: Record<string, LeaderboardDataRequest> = {
-				'global': LeaderboardDataRequest.Global,
-				'around-user': LeaderboardDataRequest.GlobalAroundUser,
-				'friends': LeaderboardDataRequest.Friends,
-			};
-			const dataRequest = fetchTypeMap[options.fetchType];
+			const dataRequest = FETCH_TYPE_MAP[options.fetchType];
 			if (dataRequest === undefined) return [];
 
 			const handle = await getLeaderboardHandle(lb.name, lb.sort, lb.display);
