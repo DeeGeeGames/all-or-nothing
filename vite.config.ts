@@ -40,7 +40,7 @@ export default defineConfig(async () => {
 						build: {
 							outDir: 'dist-electron',
 							rollupOptions: {
-								external: ['steamworks.js'],
+								external: ['steamworks-ffi-node'],
 							},
 						},
 					},

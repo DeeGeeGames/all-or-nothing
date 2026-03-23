@@ -5,10 +5,10 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const steamDirsToRemove: Readonly<Record<'linux' | 'win32' | 'darwin', readonly string[]>> = {
-	linux: ['osx', 'win64'],
-	win32: ['linux64', 'osx'],
-	darwin: ['linux64', 'win64'],
+const steamPrebuildsToRemove: Readonly<Record<'linux' | 'win32' | 'darwin', readonly string[]>> = {
+	linux: ['darwin-arm64', 'darwin-x64', 'win32-x64'],
+	win32: ['darwin-arm64', 'darwin-x64', 'linux-x64'],
+	darwin: ['linux-x64', 'win32-x64'],
 } as const;
 
 const config: Configuration = {
@@ -45,10 +45,10 @@ const config: Configuration = {
 	afterPack: async function removeUnneededFiles(context) {
 		const { appOutDir, electronPlatformName } = context;
 
-		const dirsToRemove = steamDirsToRemove[electronPlatformName] ?? [];
+		const dirsToRemove = steamPrebuildsToRemove[electronPlatformName] ?? [];
 		const steamBase = join(
 			appOutDir, 'resources', 'app.asar.unpacked',
-			'node_modules', 'steamworks.js', 'dist',
+			'node_modules', 'steamworks-ffi-node', 'prebuilds',
 		);
 
 		await Promise.all([
