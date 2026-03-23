@@ -179,6 +179,10 @@ jobs:
         with:
           name: steam-linux
           path: builds/linux
+      - name: Bundle Steam Input controller config
+        run: |
+          cp -r steam/controller_config builds/windows/controller_config
+          cp -r steam/controller_config builds/linux/controller_config
       - uses: game-ci/steam-deploy@v3
         with:
           username: ${{ secrets.STEAM_USERNAME }}
