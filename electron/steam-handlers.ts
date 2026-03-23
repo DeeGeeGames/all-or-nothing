@@ -1,6 +1,10 @@
 import { ipcMain, app, type BrowserWindow } from 'electron';
 import { existsSync } from 'fs';
 import { join, dirname } from 'path';
+import SteamworksSDK from 'steamworks-ffi-node';
+
+const steam = SteamworksSDK.getInstance();
+let steamInitialized = false;
 
 function isSteamEnvironment(): boolean {
 	// Steam sets SteamAppId when launching a game
@@ -70,25 +74,7 @@ function mapSteamInputType(inputType: string): string {
 	return mapping[inputType] ?? 'generic';
 }
 
-interface SteamClient {
-	leaderboard: {
-		uploadScore(name: string, score: number, sortMethod: string): Promise<boolean>;
-		getScores(name: string, fetchType: string, start: number, end: number): Promise<Array<{
-			globalRank: number;
-			steamId: { personaName: string };
-			score: number;
-		}>>;
-	};
-	localplayer: {
-		getName(): string;
-	};
-}
-
-let steamClient: SteamClient | null = null;
-
 // Steam Input state — uses mutable Maps for performance (polled at 60Hz)
-type SteamworksClient = Omit<import('steamworks.js').Client, 'init' | 'runCallbacks'>;
-let steamworksClient: SteamworksClient | null = null;
 let inputPollInterval: ReturnType<typeof setInterval> | null = null;
 let actionSetHandle: bigint | null = null;
 let digitalActionHandles: ReadonlyArray<{ name: string; handle: bigint }> = [];
@@ -152,9 +138,9 @@ export function shutdownSteamInput(): void {
 		inputPollInterval = null;
 	}
 	previousStates.clear();
-	if (steamworksClient) {
+	if (steamInitialized) {
 		try {
-			steamworksClient.input.shutdown();
+			steam.input.shutdown();
 		} catch {
 			// Best-effort — Steam cleans up on process exit
 		}
@@ -166,10 +152,10 @@ export function registerSteamHandlers(appId: number) {
 		if (!isSteamEnvironment()) return false;
 
 		try {
-			const steamworks = await import('steamworks.js');
-			const client = steamworks.init(appId);
-			steamworksClient = client;
-			steamClient = client as unknown as SteamClient;
+			steam.init({ appId });
+			steamInitialized = true;
+			// Required for async operations (leaderboards) to resolve
+			setInterval(() => steam.runCallbacks(), 100);
 			return true;
 		} catch {
 			return false;
