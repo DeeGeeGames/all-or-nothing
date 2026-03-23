@@ -16,5 +16,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 		offInputEvent: (): void => {
 			ipcRenderer.removeAllListeners('steam:inputEvent');
 		},
+		onGlyphMap: (callback: (data: { glyphs: Record<string, string> | null }) => void): void => {
+			ipcRenderer.on('steam:glyphMap', (_event, data) => callback(data));
+		},
+		offGlyphMap: (): void => {
+			ipcRenderer.removeAllListeners('steam:glyphMap');
+		},
 	},
 });

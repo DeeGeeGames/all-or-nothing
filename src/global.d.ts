@@ -42,6 +42,8 @@ interface ElectronSteamAPI {
 	shutdownInput(): Promise<void>;
 	onInputEvent(callback: (event: { action: string; controllerType: string }) => void): void;
 	offInputEvent(): void;
+	onGlyphMap(callback: (data: { glyphs: Record<string, string> | null }) => void): void;
+	offGlyphMap(): void;
 }
 
 interface ElectronAPI {
