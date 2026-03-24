@@ -1,0 +1,56 @@
+"controller_mappings"
+{
+	"version"		"2"
+	"title"			"Default Gamepad Layout"
+	"description"		"Standard gamepad layout for All or Nothing"
+	"creator"		""
+	"actions"
+	{
+		"GameControls"
+		{
+			"title"			"Game Controls"
+			"legacy_set"		"0"
+		}
+	}
+	"group"
+	{
+		"id"		"0"
+		"mode"		"four_buttons"
+		"bindings"
+		{
+			"button_A"		"game_action GameControls select, Select / Confirm"
+			"button_B"		"game_action GameControls back, Back / Cancel"
+			"button_X"		"game_action GameControls hint, Show Hint"
+			"button_Y"		"game_action GameControls shuffle, Shuffle Deck"
+		}
+	}
+	"group"
+	{
+		"id"		"1"
+		"mode"		"dpad"
+		"bindings"
+		{
+			"dpad_north"		"game_action GameControls navigate_up, Navigate Up"
+			"dpad_south"		"game_action GameControls navigate_down, Navigate Down"
+			"dpad_west"		"game_action GameControls navigate_left, Navigate Left"
+			"dpad_east"		"game_action GameControls navigate_right, Navigate Right"
+		}
+	}
+	"preset"
+	{
+		"id"		"0"
+		"name"		"GameControls"
+		"group_source_bindings"
+		{
+			"0"		"button_diamond active"
+			"1"		"dpad active"
+		}
+		"switch_bindings"
+		{
+			"bindings"
+			{
+				"button_escape"		"game_action GameControls pause, Pause"
+			}
+		}
+	}
+}
