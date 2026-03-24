@@ -1,6 +1,12 @@
 import { ipcMain, app, type BrowserWindow } from 'electron';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, appendFileSync } from 'fs';
 import { join, dirname } from 'path';
+
+const debugLogPath = join(dirname(app.getPath('exe')), 'steam-input-debug.log');
+function debugLog(msg: string): void {
+	const line = `[${new Date().toISOString()}] ${msg}\n`;
+	try { appendFileSync(debugLogPath, line); } catch { /* best effort */ }
+}
 import { SteamworksSDK, SteamInputType, LeaderboardSortMethod, LeaderboardDisplayType, LeaderboardDataRequest, LeaderboardUploadScoreMethod } from 'steamworks-ffi-node';
 
 const steam = SteamworksSDK.getInstance();
@@ -126,6 +132,8 @@ export function setSteamInputWindow(win: BrowserWindow): void {
 	mainWindow = win;
 }
 
+let pollDebugCountdown = 0;
+
 function pollSteamInput(): void {
 	if (!steamInitialized || !actionSetHandle || !mainWindow) return;
 
@@ -139,6 +147,15 @@ function pollSteamInput(): void {
 	const controllerHandles = steam.input.getConnectedControllers();
 	const currentHandles = new Set(controllerHandles);
 
+	// Log once per second for debugging
+	const shouldLog = pollDebugCountdown <= 0;
+	if (shouldLog) pollDebugCountdown = 60;
+	pollDebugCountdown--;
+
+	if (shouldLog) {
+		debugLog(`controllers: ${controllerHandles.length}, handles: [${controllerHandles.join(', ')}]`);
+	}
+
 	controllerHandles.forEach(handle => {
 		steam.input.activateActionSet(handle, setHandle);
 
@@ -146,7 +163,12 @@ function pollSteamInput(): void {
 		const controllerType = mapSteamInputType(steam.input.getInputTypeForHandle(handle));
 
 		digitalActionHandles.forEach(({ name, handle: actionHandle }) => {
-			const { state: pressed } = steam.input.getDigitalActionData(handle, actionHandle);
+			const actionData = steam.input.getDigitalActionData(handle, actionHandle);
+			const { state: pressed } = actionData;
+
+			if (shouldLog && name === 'select') {
+				debugLog(`"select" data: ${JSON.stringify(actionData)}`);
+			}
 			const wasPressed = prevButtonStates.get(name) ?? false;
 
 			if (pressed && !wasPressed) {
@@ -291,6 +313,11 @@ export function registerSteamHandlers(appId: number) {
 				name,
 				handle: steam.input.getDigitalActionHandle(name),
 			}));
+
+			debugLog(`actionSetHandle: ${actionSetHandle}`);
+			digitalActionHandles.forEach(({ name, handle }) => {
+				debugLog(`action "${name}" handle: ${handle}`);
+			});
 
 			inputPollInterval = setInterval(pollSteamInput, 16);
 			return true;
