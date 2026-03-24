@@ -2,8 +2,11 @@ import { ipcMain, app, type BrowserWindow } from 'electron';
 import { existsSync, readFileSync, appendFileSync } from 'fs';
 import { join, dirname } from 'path';
 
-const debugLogPath = join(app.getPath('userData'), 'steam-input-debug.log');
+let debugLogPath: string | null = null;
 function debugLog(msg: string): void {
+	if (!debugLogPath) {
+		debugLogPath = join(app.getPath('userData'), 'steam-input-debug.log');
+	}
 	const line = `[${new Date().toISOString()}] ${msg}\n`;
 	try { appendFileSync(debugLogPath, line); } catch { /* best effort */ }
 }
@@ -230,11 +233,13 @@ export function shutdownSteamInput(): void {
 
 export function registerSteamHandlers(appId: number) {
 	ipcMain.handle('steam:init', async () => {
+		debugLog(`steam:init called. isSteamEnvironment: ${isSteamEnvironment()}, SteamAppId env: ${process.env['SteamAppId'] ?? 'undefined'}`);
 		if (!isSteamEnvironment()) return false;
 
 		try {
 			steam.init({ appId });
 			steamInitialized = true;
+			debugLog('steam.init succeeded');
 			// Required for async operations (leaderboards) to resolve
 			if (callbackInterval) clearInterval(callbackInterval);
 			callbackInterval = setInterval(() => steam.runCallbacks(), 100);
