@@ -129,6 +129,8 @@ export function setSteamInputWindow(win: BrowserWindow): void {
 function pollSteamInput(): void {
 	if (!steamInitialized || !actionSetHandle || !mainWindow) return;
 
+	steam.input.runFrame();
+
 	// Assign to local consts after the null guard so TypeScript narrows
 	// inside the forEach callbacks without needing non-null assertions
 	const setHandle = actionSetHandle;
@@ -282,7 +284,7 @@ export function registerSteamHandlers(appId: number) {
 	ipcMain.handle('steam:initInput', () => {
 		if (!steamInitialized) return false;
 		try {
-			steam.input.init();
+			steam.input.init(true);
 
 			actionSetHandle = steam.input.getActionSetHandle('GameControls');
 			digitalActionHandles = STEAM_ACTION_NAMES.map(name => ({
