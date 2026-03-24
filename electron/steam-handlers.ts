@@ -2,7 +2,7 @@ import { ipcMain, app, type BrowserWindow } from 'electron';
 import { existsSync, readFileSync, appendFileSync } from 'fs';
 import { join, dirname } from 'path';
 
-const debugLogPath = join(dirname(app.getPath('exe')), 'steam-input-debug.log');
+const debugLogPath = join(app.getPath('userData'), 'steam-input-debug.log');
 function debugLog(msg: string): void {
 	const line = `[${new Date().toISOString()}] ${msg}\n`;
 	try { appendFileSync(debugLogPath, line); } catch { /* best effort */ }
