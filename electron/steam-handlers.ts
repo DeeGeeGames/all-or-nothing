@@ -228,6 +228,16 @@ export function shutdownSteamInput(): void {
 		} catch {
 			// Best-effort — Steam cleans up on process exit
 		}
+		try {
+			steam.shutdown();
+		} catch {
+			// Best-effort — Steam cleans up on process exit
+		}
+		if (callbackInterval) {
+			clearInterval(callbackInterval);
+			callbackInterval = null;
+		}
+		steamInitialized = false;
 	}
 }
 
