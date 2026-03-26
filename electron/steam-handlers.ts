@@ -16,12 +16,11 @@ const steam = SteamworksSDK.getInstance();
 let steamInitialized = false;
 let callbackInterval: ReturnType<typeof setInterval> | null = null;
 
+const exeDir = dirname(app.getPath('exe'));
+
 function isSteamEnvironment(): boolean {
-	// Steam sets SteamAppId when launching a game
 	if (process.env['SteamAppId']) return true;
 
-	// For development: check for steam_appid.txt next to the executable
-	const exeDir = dirname(app.getPath('exe'));
 	return existsSync(join(exeDir, 'steam_appid.txt'));
 }
 
@@ -328,6 +327,13 @@ export function registerSteamHandlers(appId: number) {
 	ipcMain.handle('steam:initInput', () => {
 		if (!ensureSteamInitialized(appId)) return false;
 		try {
+			const manifestPath = app.isPackaged
+				? join(exeDir, 'controller_config', 'game_actions.vdf')
+				: join(app.getAppPath(), 'steam', 'controller_config', 'game_actions.vdf');
+
+			const manifestSet = steam.input.setInputActionManifestFilePath(manifestPath);
+			debugLog(`action manifest: ${manifestPath} (set: ${manifestSet}, exists: ${existsSync(manifestPath)})`);
+
 			steam.input.init(true);
 
 			actionSetHandle = steam.input.getActionSetHandle('GameControls');
