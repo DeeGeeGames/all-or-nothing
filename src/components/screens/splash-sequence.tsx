@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useEventListener } from 'usehooks-ts';
 import { useSetActiveScreen } from '@/atoms';
 import { Screens } from '@/types';
+import { useSteamInputManager, useGamepadManager } from '@/input/input-hooks';
 import ReactSplash from './splash-screens/react-splash';
 import LibrariesSplash from './splash-screens/libraries-splash';
 import jotaiLogoUrl from './splash-screens/logos/jotai.png';
@@ -110,6 +111,8 @@ export default function SplashSequence() {
 	// Skip input listeners
 	useEventListener('pointerdown', handleSkip);
 	useEventListener('keydown', handleSkip);
+	useSteamInputManager(handleSkip);
+	useGamepadManager(handleSkip);
 
 	const opacity = phase === 'fade-out' ? 0 : 1;
 	const Content = currentScreen?.content;
