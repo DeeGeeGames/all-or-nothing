@@ -241,22 +241,29 @@ export function shutdownSteamInput(): void {
 	}
 }
 
-export function registerSteamHandlers(appId: number) {
-	ipcMain.handle('steam:init', async () => {
-		debugLog(`steam:init called. isSteamEnvironment: ${isSteamEnvironment()}, SteamAppId env: ${process.env['SteamAppId'] ?? 'undefined'}`);
-		if (!isSteamEnvironment()) return false;
+function ensureSteamInitialized(appId: number): boolean {
+	if (steamInitialized) return true;
 
-		try {
-			steam.init({ appId });
-			steamInitialized = true;
-			debugLog('steam.init succeeded');
-			// Required for async operations (leaderboards) to resolve
-			if (callbackInterval) clearInterval(callbackInterval);
-			callbackInterval = setInterval(() => steam.runCallbacks(), 100);
-			return true;
-		} catch {
-			return false;
-		}
+	debugLog(`ensureSteamInitialized: isSteamEnvironment: ${isSteamEnvironment()}, SteamAppId env: ${process.env['SteamAppId'] ?? 'undefined'}`);
+	if (!isSteamEnvironment()) return false;
+
+	try {
+		steam.init({ appId });
+		steamInitialized = true;
+		debugLog('steam.init succeeded');
+		if (callbackInterval) clearInterval(callbackInterval);
+		// Required for async operations (leaderboards) to resolve
+		callbackInterval = setInterval(() => steam.runCallbacks(), 100);
+		return true;
+	} catch (e) {
+		debugLog(`steam.init failed: ${e}`);
+		return false;
+	}
+}
+
+export function registerSteamHandlers(appId: number) {
+	ipcMain.handle('steam:init', () => {
+		return ensureSteamInitialized(appId);
 	});
 
 	ipcMain.handle('steam:submitScore', async (_event, data: { score: number; time: number; maxCombo: number }) => {
@@ -319,7 +326,7 @@ export function registerSteamHandlers(appId: number) {
 	});
 
 	ipcMain.handle('steam:initInput', () => {
-		if (!steamInitialized) return false;
+		if (!ensureSteamInitialized(appId)) return false;
 		try {
 			steam.input.init(true);
 
