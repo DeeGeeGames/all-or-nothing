@@ -99,7 +99,7 @@ jobs:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.asset_glob }}
       - name: Upload unpacked build for Steam
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.steam_artifact_name }}
           path: ${{ matrix.steam_artifact_path }}
@@ -131,17 +131,17 @@ jobs:
       BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
     steps:
       - name: Download web build
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: web-dist-itchio
           path: web
       - name: Download Linux build
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: desktop-linux
           path: desktop-linux
       - name: Download Windows build
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: desktop-windows
           path: desktop-windows
@@ -170,12 +170,12 @@ jobs:
         with:
           sparse-checkout: steam
       - name: Download Windows build
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: steam-windows
           path: builds/windows
       - name: Download Linux build
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: steam-linux
           path: builds/linux
