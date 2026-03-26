@@ -1,6 +1,6 @@
 import PlayingCard from '../playing-card';
 import { BitwiseValue, Card, Screens } from '../../types';
-import { resetGame, randomChoice } from '../../utils';
+import { resetGame, randomChoice, useTimeout } from '../../utils';
 import { useSetActiveScreen, useActiveController, useSplashComplete, useSetSplashComplete } from '../../atoms';
 import { useSetActiveGroup } from '@/focus/focus-atoms';
 import { useGameTheme } from '@/themes';
@@ -8,7 +8,8 @@ import { fireConvergenceConfetti } from '@/confetti';
 import FormattedTime from '../formatted-time';
 import { SavedGameKey, TutorialCompletedKey } from '@/constants';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useGamepadManager, useKeyboardManager } from '@/input/input-hooks';
+import { useGamepadManager, useKeyboardManager, useSteamInputManager } from '@/input/input-hooks';
+import { useEventListener } from 'usehooks-ts';
 import { InputEvent, InputAction } from '@/input/input-types';
 import { motion, useReducedMotion } from 'framer-motion';
 import {
@@ -104,6 +105,13 @@ const buttonVariants = {
 		transition: { duration: 0.3, ease: 'easeOut' },
 	},
 } as const;
+
+const MAX_MENU_BUTTONS = 9;
+const MENU_ANIM_DURATION_MS = (
+	buttonContainerVariants.visible.transition.delayChildren +
+	buttonContainerVariants.visible.transition.staggerChildren * (MAX_MENU_BUTTONS - 1) +
+	buttonVariants.visible.transition.duration
+) * 1000;
 
 // --- Demo match loop constants ---
 
@@ -209,11 +217,20 @@ export default function Landing() {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const confettiTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 	const useSideLayout = useMediaQuery('(max-height: 800px) and (min-width: 700px)');
+	const [menuAnimDone, setMenuAnimDone] = useState(
+		() => !!prefersReducedMotion || splashComplete,
+	);
+	const [animKey, setAnimKey] = useState(0);
 
-	// Set focus group based on whether the tutorial prompt is open
+	// Set focus group based on animation state and whether the tutorial prompt is open.
+	// During animation, use a non-matching group so setActiveGroupAtom clears focus
+	// (empty string is falsy and would skip the clear logic).
 	useEffect(() => {
-		setActiveGroup(showFirstTimePrompt ? 'tutorial-prompt' : 'menu');
-	}, [setActiveGroup, showFirstTimePrompt]);
+		const group = !menuAnimDone ? 'animating'
+			: showFirstTimePrompt ? 'tutorial-prompt'
+			: 'menu';
+		setActiveGroup(group);
+	}, [setActiveGroup, showFirstTimePrompt, menuAnimDone]);
 
 	// Timed phase transitions (dealing, idle, matched, empty)
 	useEffect(() => {
@@ -277,6 +294,10 @@ export default function Landing() {
 		return () => clearTimeout(confettiTimeoutRef.current);
 	}, [phase, prefersReducedMotion, demoCards, gameTheme.colors]);
 
+	// Auto-complete menu animation after stagger finishes
+	const menuAnimActive = !menuAnimDone && splashComplete && isPlatformReady && !prefersReducedMotion;
+	useTimeout(() => setMenuAnimDone(true), menuAnimActive ? MENU_ANIM_DURATION_MS : null);
+
 	// Stable callback refs for button handlers
 	const handleContinue = useCallback(() => {
 		setActiveScreen(Screens.Game);
@@ -333,9 +354,21 @@ export default function Landing() {
 		setActiveScreen(Screens.Tutorial);
 	}, [setActiveScreen]);
 
+	// Skip menu stagger animation on any input
+	function skipMenuAnimation() {
+		if (!splashComplete || menuAnimDone) return;
+		setMenuAnimDone(true);
+		setAnimKey(k => k + 1);
+	}
+
 	// Handle controller/keyboard input for the tutorial prompt dialog
 	const promptInputRef = useRef<(event: InputEvent) => void>(() => {});
 	promptInputRef.current = (event: InputEvent) => {
+		if (!menuAnimDone) {
+			skipMenuAnimation();
+			return;
+		}
+
 		if (!showFirstTimePrompt) return;
 
 		if (event.action === InputAction.SELECT) {
@@ -353,6 +386,10 @@ export default function Landing() {
 
 	useGamepadManager(stablePromptInputHandler);
 	useKeyboardManager(stablePromptInputHandler);
+	useSteamInputManager(stablePromptInputHandler);
+
+	useEventListener('pointerdown', skipMenuAnimation);
+	useEventListener('keydown', skipMenuAnimation);
 
 	const needsFadeIn = useRef(!splashComplete).current;
 
@@ -408,8 +445,9 @@ export default function Landing() {
 	const titleSection = (
 		<Box paddingY={useSideLayout ? 3 : 7}>
 			<motion.div
+				key={`title-${animKey}`}
 				variants={titleContainerVariants}
-				initial={initialState}
+				initial={menuAnimDone ? false : initialState}
 				animate={splashComplete ? 'visible' : initialState}
 			>
 				<Typography
@@ -443,9 +481,11 @@ export default function Landing() {
 			width={300}
 		>
 			<motion.div
+				key={`buttons-${animKey}`}
 				variants={buttonContainerVariants}
-				initial={initialState}
+				initial={menuAnimDone ? false : initialState}
 				animate={(isPlatformReady && splashComplete) ? 'visible' : initialState}
+				style={menuAnimDone ? undefined : { pointerEvents: 'none' }}
 			>
 				<Box display="flex" flexDirection="column" gap={2}>
 					<motion.div variants={buttonVariants}>
@@ -455,7 +495,7 @@ export default function Landing() {
 							order={0}
 							startIcon={<TodayIcon />}
 							onClick={handleDaily}
-							autoFocus={!savedGameTime}
+							autoFocus={menuAnimDone && !savedGameTime}
 						>
 							Daily Board{dailyStreak > 0 ? ` (${dailyStreak} day streak)` : ''}
 						</FocusableButton>
