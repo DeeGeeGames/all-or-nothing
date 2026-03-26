@@ -49,6 +49,9 @@ jobs:
           projectId: make-a-set
 
   build_desktop:
+    permissions:
+      id-token: write
+      contents: read
     strategy:
       matrix:
         include:
@@ -85,6 +88,14 @@ jobs:
           flatpak remote-add --if-not-exists --user flathub https://dl.flathub.org/repo/flathub.flatpakrepo
           flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08 org.electronjs.Electron2.BaseApp//24.08
       - run: npm ci
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Download Steamworks SDK
+        run: |
+          aws s3 cp ${{ vars.STEAM_SDK_S3_URI }} .
+          tar xzf steamworks_sdk.tar.gz
       - name: Sync package.json version from tag
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
         shell: bash
