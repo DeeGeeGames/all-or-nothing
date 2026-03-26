@@ -22,6 +22,13 @@ const config: Configuration = {
 		'dist-electron/**/*',
 		'!steam_appid.txt',
 	],
+	extraFiles: [
+		{
+			from: 'steam/controller_config',
+			to: 'controller_config',
+			filter: ['*.vdf'],
+		},
+	],
 	electronLanguages: ['en-US'],
 	icon: 'public/assets/android-chrome-512x512.png',
 	linux: {
