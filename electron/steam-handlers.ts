@@ -139,7 +139,7 @@ let pollDebugCountdown = 0;
 function pollSteamInput(): void {
 	if (!steamInitialized || !actionSetHandle || !mainWindow) return;
 
-	steam.input.runFrame(true);
+	steam.input.runFrame();
 
 	// Assign to local consts after the null guard so TypeScript narrows
 	// inside the forEach callbacks without needing non-null assertions
@@ -336,12 +336,23 @@ export function registerSteamHandlers(appId: number) {
 	ipcMain.handle('steam:initInput', () => {
 		if (!ensureSteamInitialized(appId)) return false;
 		try {
-			const manifestPath = app.isPackaged
-				? join(exeDir, 'controller_config', 'game_actions.vdf')
-				: join(app.getAppPath(), 'steam', 'controller_config', 'game_actions.vdf');
-
-			const manifestSet = steam.input.setInputActionManifestFilePath(manifestPath);
-			debugLog(`action manifest: ${manifestPath} (set: ${manifestSet}, exists: ${existsSync(manifestPath)})`);
+			// NOTE: setInputActionManifestFilePath was attempted here but produced 0 handles
+			// for all actions, likely because the game is unpublished. The IGA and default
+			// configurations must be published on the Steamworks partner site for Steam Input
+			// to work. If Steam Input still doesn't work after publishing, re-enable this:
+			//
+			//   const manifestPath = app.isPackaged
+			//     ? join(exeDir, 'controller_config', 'game_actions.vdf')
+			//     : join(app.getAppPath(), 'steam', 'controller_config', 'game_actions.vdf');
+			//   steam.input.setInputActionManifestFilePath(manifestPath);
+			//
+			// Diagnostics from pre-publish testing (2026-03-27):
+			// - Without manifest call: handles valid (1-9), active:true, origins bound,
+			//   but state always false — Steam partially loads draft IGA but doesn't
+			//   forward actual button data for unpublished titles.
+			// - With manifest call: set returns true, file exists, but all handles are 0.
+			// - Generic gamepad template works because it bypasses Steam Input entirely
+			//   and emits XInput events to the browser Gamepad API.
 
 			steam.input.init(true);
 
