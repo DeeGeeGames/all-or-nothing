@@ -139,7 +139,7 @@ let pollDebugCountdown = 0;
 function pollSteamInput(): void {
 	if (!steamInitialized || !actionSetHandle || !mainWindow) return;
 
-	steam.input.runFrame();
+	steam.input.runFrame(true);
 
 	// Assign to local consts after the null guard so TypeScript narrows
 	// inside the forEach callbacks without needing non-null assertions
