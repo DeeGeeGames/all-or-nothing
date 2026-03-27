@@ -161,6 +161,15 @@ function pollSteamInput(): void {
 	controllerHandles.forEach(handle => {
 		steam.input.activateActionSet(handle, setHandle);
 
+		if (shouldLog) {
+			const currentSet = steam.input.getCurrentActionSet(handle);
+			const inputType = steam.input.getInputTypeForHandle(handle);
+			const selectOrigins = digitalActionHandles[0]
+				? steam.input.getDigitalActionOrigins(handle, setHandle, digitalActionHandles[0].handle)
+				: [];
+			debugLog(`controller ${handle}: type=${inputType} (${mapSteamInputType(inputType)}), currentActionSet=${currentSet}, expectedActionSet=${setHandle}, selectOrigins=[${selectOrigins.join(', ')}]`);
+		}
+
 		const prevButtonStates = previousStates.get(handle) ?? new Map<string, boolean>();
 		const controllerType = mapSteamInputType(steam.input.getInputTypeForHandle(handle));
 
@@ -327,13 +336,6 @@ export function registerSteamHandlers(appId: number) {
 	ipcMain.handle('steam:initInput', () => {
 		if (!ensureSteamInitialized(appId)) return false;
 		try {
-			const manifestPath = app.isPackaged
-				? join(exeDir, 'controller_config', 'game_actions.vdf')
-				: join(app.getAppPath(), 'steam', 'controller_config', 'game_actions.vdf');
-
-			const manifestSet = steam.input.setInputActionManifestFilePath(manifestPath);
-			debugLog(`action manifest: ${manifestPath} (set: ${manifestSet}, exists: ${existsSync(manifestPath)})`);
-
 			steam.input.init(true);
 
 			actionSetHandle = steam.input.getActionSetHandle('GameControls');
