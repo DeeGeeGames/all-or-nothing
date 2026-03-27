@@ -336,6 +336,13 @@ export function registerSteamHandlers(appId: number) {
 	ipcMain.handle('steam:initInput', () => {
 		if (!ensureSteamInitialized(appId)) return false;
 		try {
+			const manifestPath = app.isPackaged
+				? join(exeDir, 'controller_config', 'game_actions.vdf')
+				: join(app.getAppPath(), 'steam', 'controller_config', 'game_actions.vdf');
+
+			const manifestSet = steam.input.setInputActionManifestFilePath(manifestPath);
+			debugLog(`action manifest: ${manifestPath} (set: ${manifestSet}, exists: ${existsSync(manifestPath)})`);
+
 			steam.input.init(true);
 
 			actionSetHandle = steam.input.getActionSetHandle('GameControls');
