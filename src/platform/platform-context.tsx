@@ -27,7 +27,16 @@ export function PlatformProvider({ service, children }: Props) {
 
 	useEffect(() => {
 		service.init()
-			.then(setIsAvailable)
+			.then(async (available) => {
+				setIsAvailable(available);
+				if (available) {
+					const cloudData = await service.cloudLoad();
+					if (cloudData) {
+						const { importGameState } = await import('@/core');
+						await importGameState(cloudData);
+					}
+				}
+			})
 			.catch(() => setIsAvailable(false))
 			.finally(() => setIsReady(true));
 	}, [service]);

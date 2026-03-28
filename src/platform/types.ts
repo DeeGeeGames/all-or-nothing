@@ -43,9 +43,26 @@ interface GameCompletionData {
 }
 
 export
+interface GameSaveData {
+	readonly version: 1;
+	readonly savedAt: number;
+	readonly deck: readonly string[];
+	readonly discard: readonly string[];
+	readonly time: number;
+	readonly shuffleCount: number;
+	readonly score: number;
+	readonly scoreValue: number;
+	readonly lastMatchTime: number;
+	readonly comboCount: number;
+	readonly maxCombo: number;
+}
+
+export
 interface PlatformService {
 	init(): Promise<boolean>;
 	submitScore(data: GameCompletionData): Promise<boolean>;
 	fetchLeaderboard(options: LeaderboardFetchOptions): Promise<readonly LeaderboardEntry[]>;
 	getPlayerName(): Promise<string | null>;
+	cloudSave(data: GameSaveData): Promise<boolean>;
+	cloudLoad(): Promise<GameSaveData | null>;
 }

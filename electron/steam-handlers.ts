@@ -24,6 +24,10 @@ function isSteamEnvironment(): boolean {
 	return existsSync(join(exeDir, 'steam_appid.txt'));
 }
 
+function isCloudAvailable(): boolean {
+	return steam.cloud.isCloudEnabledForAccount() && steam.cloud.isCloudEnabledForApp();
+}
+
 const leaderboardHandles: Map<string, bigint> = new Map();
 
 async function getLeaderboardHandle(name: string, sortMethod: LeaderboardSortMethod, displayType: LeaderboardDisplayType): Promise<bigint | null> {
@@ -376,5 +380,17 @@ export function registerSteamHandlers(appId: number) {
 
 	ipcMain.handle('steam:shutdownInput', () => {
 		shutdownSteamInput();
+	});
+
+	ipcMain.handle('steam:cloudSave', (_event, json: string) => {
+		if (!steamInitialized || !isCloudAvailable()) return false;
+		return steam.cloud.fileWrite('savegame.json', Buffer.from(json, 'utf8'));
+	});
+
+	ipcMain.handle('steam:cloudLoad', () => {
+		if (!steamInitialized || !isCloudAvailable()) return null;
+		const result = steam.cloud.fileRead('savegame.json');
+		if (!result.success || !result.data) return null;
+		return result.data.toString('utf8');
 	});
 }

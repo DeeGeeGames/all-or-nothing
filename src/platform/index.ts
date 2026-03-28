@@ -6,5 +6,6 @@ export type {
 	LeaderboardEntry,
 	LeaderboardFetchOptions,
 	GameCompletionData,
+	GameSaveData,
 } from './types';
 export { LeaderboardName, LeaderboardFetchType } from './types';

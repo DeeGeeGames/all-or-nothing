@@ -7,6 +7,7 @@ import AdLinkSection from '@/components/ad-link-section';
 import GameOverOverlay from './game-over-overlay';
 import {
 	discardCards,
+	exportGameState,
 	getMismatchedAttributes,
 	isSet,
 	setExists,
@@ -34,6 +35,7 @@ import { getKeyboardManager } from '@/input/keyboard-manager';
 import { InputAction, InputEvent } from '@/input/input-types';
 import { BoardCardCount } from '@/constants';
 import { useDeck, useTime, useScore, useShuffleCount, useDeckOrder, useDiscardPile, useMaxCombo } from '@/game-queries';
+import { usePlatform } from '@/platform';
 
 const {
 	VITE_AD_CONTENT_URL = '',
@@ -41,6 +43,7 @@ const {
 
 export default
 function GamePlayArea() {
+	const { service } = usePlatform();
 	const deck = useDeck();
 	const time = useTime();
 	const score = useScore();
@@ -67,6 +70,30 @@ function GamePlayArea() {
 	const gameComplete = useMemo(() => (
 		deckLoaded && (manualGameComplete || deck.length === 0)
 	), [deckLoaded, manualGameComplete, deck.length]);
+
+	async function triggerCloudSave() {
+		try {
+			const data = await exportGameState();
+			await service.cloudSave(data);
+		} catch {
+			// Best-effort — cloud save failures are non-fatal
+		}
+	}
+
+	// Save to cloud on mount (covers new game from title screen)
+	useEffect(() => {
+		triggerCloudSave();
+	}, []);
+
+	// Save to cloud when a new game is started mid-session (pause menu reset)
+	const isFirstGameGeneration = useRef(true);
+	useEffect(() => {
+		if (isFirstGameGeneration.current) {
+			isFirstGameGeneration.current = false;
+			return;
+		}
+		triggerCloudSave();
+	}, [gameGeneration]);
 
 	// Reset combo state when the game screen mounts (continuing a game should not preserve combo)
 	useEffect(() => {
@@ -283,6 +310,7 @@ function GamePlayArea() {
 
 		setSelectedCards([]);
 		await shuffleDeck();
+		triggerCloudSave();
 	}
 	async function toggleSelected(cardId: string) {
 		if(!(deckOrder && dealtCards)) {
@@ -318,7 +346,7 @@ function GamePlayArea() {
 			// are still grid items (avoids popLayout z-index issues).
 			// Timing: 350ms glow delay + 700ms animation + 50ms buffer
 			discardTimeoutRef.current = setTimeout(() => {
-				discardCards(newSelectedCardIds, BoardCardCount);
+				discardCards(newSelectedCardIds, BoardCardCount).then(() => triggerCloudSave());
 			}, 1100);
 			soundEffects('success');
 			setSelectedCards([]);

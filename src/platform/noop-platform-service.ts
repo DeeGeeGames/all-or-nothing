@@ -6,5 +6,7 @@ export function createNoopPlatformService(): PlatformService {
 		submitScore: async () => false,
 		fetchLeaderboard: async () => [],
 		getPlayerName: async () => null,
+		cloudSave: async () => false,
+		cloudLoad: async () => null,
 	};
 }

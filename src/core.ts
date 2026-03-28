@@ -15,7 +15,7 @@ import {
 	DbName,
 	SavedGameKey,
 } from './constants';
-import type { GameCompletionData } from './platform/types';
+import type { GameCompletionData, GameSaveData } from './platform/types';
 import {
 	BitwiseValue,
 	Card,
@@ -243,6 +243,51 @@ async function resetComboState() {
 		db.gamedata.update(DbCollectionItemNameGameDataLastMatchTime, { value: 0 }),
 		db.gamedata.update(DbCollectionItemNameGameDataComboCount, { value: 0 }),
 	]);
+}
+
+export
+async function exportGameState(): Promise<GameSaveData> {
+	const [deck, discard, time, shuffleCount, score, scoreValue, lastMatchTime, comboCount, maxCombo] =
+		await Promise.all([
+			db.setorders.get(DbCollectionItemNameSetOrdersDeck),
+			db.setorders.get(DbCollectionItemNameSetOrdersDiscard),
+			db.gamedata.get(DbCollectionItemNameGameDataTime),
+			db.gamedata.get(DbCollectionItemNameGameDataShuffleCount),
+			db.gamedata.get(DbCollectionItemNameGameDataScore),
+			db.gamedata.get(DbCollectionItemNameGameDataScoreValue),
+			db.gamedata.get(DbCollectionItemNameGameDataLastMatchTime),
+			db.gamedata.get(DbCollectionItemNameGameDataComboCount),
+			db.gamedata.get(DbCollectionItemNameGameDataMaxCombo),
+		]);
+	return {
+		version: 1,
+		savedAt: Date.now(),
+		deck: deck?.order ?? [],
+		discard: discard?.order ?? [],
+		time: time?.value ?? 0,
+		shuffleCount: shuffleCount?.value ?? 0,
+		score: score?.value ?? 0,
+		scoreValue: scoreValue?.value ?? SCORE_CONFIG.BASE_VALUE,
+		lastMatchTime: lastMatchTime?.value ?? 0,
+		comboCount: comboCount?.value ?? 0,
+		maxCombo: maxCombo?.value ?? 0,
+	};
+}
+
+export
+async function importGameState(data: GameSaveData): Promise<void> {
+	await Promise.all([
+		db.setorders.update(DbCollectionItemNameSetOrdersDeck, { order: [...data.deck] }),
+		db.setorders.update(DbCollectionItemNameSetOrdersDiscard, { order: [...data.discard] }),
+		db.gamedata.update(DbCollectionItemNameGameDataTime, { value: data.time }),
+		db.gamedata.update(DbCollectionItemNameGameDataShuffleCount, { value: data.shuffleCount }),
+		db.gamedata.update(DbCollectionItemNameGameDataScore, { value: data.score }),
+		db.gamedata.update(DbCollectionItemNameGameDataScoreValue, { value: data.scoreValue }),
+		db.gamedata.update(DbCollectionItemNameGameDataLastMatchTime, { value: data.lastMatchTime }),
+		db.gamedata.update(DbCollectionItemNameGameDataComboCount, { value: data.comboCount }),
+		db.gamedata.update(DbCollectionItemNameGameDataMaxCombo, { value: data.maxCombo }),
+	]);
+	localStorage.setItem(SavedGameKey, String(data.time));
 }
 
 export

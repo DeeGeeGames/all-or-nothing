@@ -36,5 +36,7 @@ export function createMockPlatformService(): PlatformService {
 		getPlayerName: async () => MOCK_PLAYER_NAME,
 		fetchLeaderboard: async (options: LeaderboardFetchOptions) =>
 			MOCK_DATA[options.leaderboard] ?? [],
+		cloudSave: async () => true,
+		cloudLoad: async () => null,
 	};
 }

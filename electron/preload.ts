@@ -22,5 +22,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 		offGlyphMap: (): void => {
 			ipcRenderer.removeAllListeners('steam:glyphMap');
 		},
+		cloudSave: (data: string): Promise<boolean> => ipcRenderer.invoke('steam:cloudSave', data),
+		cloudLoad: (): Promise<string | null> => ipcRenderer.invoke('steam:cloudLoad'),
 	},
 });

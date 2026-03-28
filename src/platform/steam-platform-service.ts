@@ -1,4 +1,4 @@
-import type { PlatformService, LeaderboardFetchOptions, GameCompletionData } from './types';
+import type { PlatformService, LeaderboardFetchOptions, GameCompletionData, GameSaveData } from './types';
 
 export function createSteamPlatformService(): PlatformService {
 	const api = window.electronAPI?.steam;
@@ -38,6 +38,32 @@ export function createSteamPlatformService(): PlatformService {
 			if (!api) return null;
 			try {
 				return await api.getPlayerName() ?? null;
+			} catch {
+				return null;
+			}
+		},
+
+		async cloudSave(data: GameSaveData) {
+			if (!api) return false;
+			try {
+				return await api.cloudSave(JSON.stringify(data));
+			} catch {
+				return false;
+			}
+		},
+
+		async cloudLoad() {
+			if (!api) return null;
+			try {
+				const json = await api.cloudLoad();
+				if (!json) return null;
+				const parsed: unknown = JSON.parse(json);
+				if (
+					typeof parsed !== 'object' ||
+					parsed === null ||
+					(parsed as { version?: unknown }).version !== 1
+				) return null;
+				return parsed as GameSaveData;
 			} catch {
 				return null;
 			}
