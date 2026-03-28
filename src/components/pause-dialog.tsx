@@ -8,6 +8,8 @@ import {
 	useSetIsSoundEnabled,
 	useIsMusicEnabled,
 	useSetIsMusicEnabled,
+	useIsFullscreen,
+	useSetFullscreen,
 } from '../atoms';
 import {
 	PlayArrow as PlayArrowIcon,
@@ -17,6 +19,8 @@ import {
 	VolumeOff as VolumeOffIcon,
 	MusicNote as MusicNoteIcon,
 	MusicOff as MusicOffIcon,
+	Fullscreen as FullscreenIcon,
+	FullscreenExit as FullscreenExitIcon,
 } from '@mui/icons-material';
 import HelpDialogTrigger from './help-dialog-trigger';
 import { useCallback } from 'react';
@@ -33,6 +37,8 @@ function PauseDialog() {
 	const setIsSoundEnabled = useSetIsSoundEnabled();
 	const isMusicEnabled = useIsMusicEnabled();
 	const setIsMusicEnabled = useSetIsMusicEnabled();
+	const isFullscreen = useIsFullscreen();
+	const setFullscreen = useSetFullscreen();
 
 	const handleUnpause = useCallback(async () => {
 		await resetComboState();
@@ -60,6 +66,10 @@ function PauseDialog() {
 	const handleToggleMusic = useCallback(() => {
 		setIsMusicEnabled(!isMusicEnabled);
 	}, [isMusicEnabled, setIsMusicEnabled]);
+
+	const handleToggleFullscreen = useCallback(() => {
+		setFullscreen(!isFullscreen);
+	}, [isFullscreen, setFullscreen]);
 
 	return (
 		<SharedPauseDialog
@@ -108,9 +118,18 @@ function PauseDialog() {
 				Music: {isMusicEnabled ? 'On' : 'Off'}
 			</FocusableButton>
 			<FocusableButton
-				id="pause-back"
+				id="pause-fullscreen"
 				group={FOCUS_GROUP}
 				order={5}
+				startIcon={isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+				onClick={handleToggleFullscreen}
+			>
+				Fullscreen: {isFullscreen ? 'On' : 'Off'}
+			</FocusableButton>
+			<FocusableButton
+				id="pause-back"
+				group={FOCUS_GROUP}
+				order={6}
 				startIcon={<BackIcon />}
 				onClick={handleBackToTitle}
 			>
