@@ -9,9 +9,11 @@ declare const __STEAM_APP_ID__: number;
 
 registerSteamHandlers(__STEAM_APP_ID__);
 
+let win: BrowserWindow | null = null;
+
 function createWindow() {
 	Menu.setApplicationMenu(null);
-	const win = new BrowserWindow({
+	win = new BrowserWindow({
 		width: 1280,
 		height: 800,
 		minWidth: 1280,
@@ -28,7 +30,7 @@ function createWindow() {
 
 	setSteamInputWindow(win);
 	win.setAspectRatio(16 / 10);
-	win.once('ready-to-show', () => win.show());
+	win.once('ready-to-show', () => win?.show());
 
 	if (process.env['VITE_DEV_SERVER_URL']) {
 		win.loadURL(process.env['VITE_DEV_SERVER_URL']);
@@ -38,6 +40,10 @@ function createWindow() {
 }
 
 ipcMain.on('app:quit', () => app.quit());
+ipcMain.on('app:setFullscreen', (_event, enabled: boolean) => {
+	win?.setFullScreen(enabled);
+});
+ipcMain.handle('app:isFullscreen', () => win?.isFullScreen() ?? false);
 
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => app.quit());

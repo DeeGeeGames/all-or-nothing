@@ -51,6 +51,8 @@ interface ElectronSteamAPI {
 interface ElectronAPI {
 	readonly platform: 'electron';
 	readonly quit: () => void;
+	readonly setFullscreen: (enabled: boolean) => void;
+	readonly isFullscreen: () => Promise<boolean>;
 	readonly steam: ElectronSteamAPI;
 }
 

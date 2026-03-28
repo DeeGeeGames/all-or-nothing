@@ -3,6 +3,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('electronAPI', {
 	platform: 'electron' as const,
 	quit: (): void => { ipcRenderer.send('app:quit'); },
+	setFullscreen: (enabled: boolean): void => { ipcRenderer.send('app:setFullscreen', enabled); },
+	isFullscreen: (): Promise<boolean> => ipcRenderer.invoke('app:isFullscreen'),
 	steam: {
 		init: (): Promise<boolean> => ipcRenderer.invoke('steam:init'),
 		submitScore: (data: { score: number; time: number; maxCombo: number }): Promise<boolean> => ipcRenderer.invoke('steam:submitScore', data),
