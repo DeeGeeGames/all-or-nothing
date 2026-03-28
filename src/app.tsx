@@ -17,6 +17,8 @@ import {
 	useSetActiveController,
 	useUsingNavigationalInput,
 	useLoadAudioSettings,
+	useLoadFullscreenSetting,
+	useFullscreenSync,
 	useSetupDebugUtilities,
 	useSplashComplete,
 	useSetSteamGlyphMap,
@@ -56,6 +58,8 @@ function App() {
 	const navigate = useNavigate();
 	const selectCurrent = useSelectCurrent();
 	const loadAudioSettings = useLoadAudioSettings();
+	const loadFullscreenSetting = useLoadFullscreenSetting();
+	useFullscreenSync();
 
 	useSetupDebugUtilities();
 	useInitializeThemes();
@@ -73,6 +77,10 @@ function App() {
 	useEffect(() => {
 		loadAudioSettings();
 	}, [loadAudioSettings]);
+
+	useEffect(() => {
+		loadFullscreenSetting();
+	}, [loadFullscreenSetting]);
 
 	const actionHandlers = useMemo(() => ({
 		[PrimaryInputAction.NAVIGATE_UP]: () => navigate(NavigationDirection.UP),

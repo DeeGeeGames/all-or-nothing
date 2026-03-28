@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { Screens } from './types';
 import { ControllerType } from './input/input-types';
 import { getSoundEnabled, getMusicEnabled, updateSoundEnabled, updateMusicEnabled } from './core';
+import { FullscreenEnabledKey } from './constants';
 import { useClearFocus } from './focus/focus-atoms';
 
 const soundAtom = atom(true);
@@ -60,6 +61,73 @@ const loadAudioSettingsAtom = atom(
 export
 function useLoadAudioSettings() {
 	return useSetAtom(loadAudioSettingsAtom);
+}
+
+const fullscreenAtom = atom(false);
+
+export
+function useIsFullscreen() {
+	return useAtomValue(fullscreenAtom);
+}
+
+const setFullscreenAtom = atom(
+	null,
+	async (_get, set, enabled: boolean) => {
+		set(fullscreenAtom, enabled);
+
+		if (window.electronAPI) {
+			window.electronAPI.setFullscreen(enabled);
+			localStorage.setItem(FullscreenEnabledKey, enabled ? '1' : '0');
+		} else if (enabled) {
+			await document.documentElement.requestFullscreen().catch(() => {
+				set(fullscreenAtom, false);
+			});
+		} else if (document.fullscreenElement) {
+			await document.exitFullscreen().catch(() => {});
+		}
+	}
+);
+
+export
+function useSetFullscreen() {
+	return useSetAtom(setFullscreenAtom);
+}
+
+const loadFullscreenSettingAtom = atom(
+	null,
+	async (_get, set) => {
+		if (!window.electronAPI) return;
+
+		const stored = localStorage.getItem(FullscreenEnabledKey);
+		const enabled = stored === '1';
+		set(fullscreenAtom, enabled);
+
+		if (enabled) {
+			window.electronAPI.setFullscreen(true);
+		}
+	}
+);
+
+export
+function useLoadFullscreenSetting() {
+	return useSetAtom(loadFullscreenSettingAtom);
+}
+
+export
+function useFullscreenSync() {
+	const setFullscreen = useSetAtom(fullscreenAtom);
+
+	useEffect(() => {
+		function handleFullscreenChange() {
+			setFullscreen(!!document.fullscreenElement);
+		}
+
+		document.addEventListener('fullscreenchange', handleFullscreenChange);
+
+		return () => {
+			document.removeEventListener('fullscreenchange', handleFullscreenChange);
+		};
+	}, [setFullscreen]);
 }
 
 const activeControllerAtom = atom<ControllerType | null>(null);
