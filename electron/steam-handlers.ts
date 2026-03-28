@@ -383,13 +383,18 @@ export function registerSteamHandlers(appId: number) {
 	});
 
 	ipcMain.handle('steam:cloudSave', (_event, json: string) => {
+		debugLog(`cloudSave: initialized=${steamInitialized}, accountCloud=${steamInitialized && steam.cloud.isCloudEnabledForAccount()}, appCloud=${steamInitialized && steam.cloud.isCloudEnabledForApp()}, bytes=${json.length}`);
 		if (!steamInitialized || !isCloudAvailable()) return false;
-		return steam.cloud.fileWrite('savegame.json', Buffer.from(json, 'utf8'));
+		const result = steam.cloud.fileWrite('savegame.json', Buffer.from(json, 'utf8'));
+		debugLog(`cloudSave: fileWrite result=${result}`);
+		return result;
 	});
 
 	ipcMain.handle('steam:cloudLoad', () => {
+		debugLog(`cloudLoad: initialized=${steamInitialized}, accountCloud=${steamInitialized && steam.cloud.isCloudEnabledForAccount()}, appCloud=${steamInitialized && steam.cloud.isCloudEnabledForApp()}`);
 		if (!steamInitialized || !isCloudAvailable()) return null;
 		const result = steam.cloud.fileRead('savegame.json');
+		debugLog(`cloudLoad: success=${result.success}, bytesRead=${result.bytesRead}`);
 		if (!result.success || !result.data) return null;
 		return result.data.toString('utf8');
 	});
