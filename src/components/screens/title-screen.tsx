@@ -40,6 +40,7 @@ import PlatformButton from '@/components/platform-button';
 import { usePlatform } from '@/platform';
 import { getCurrentStreak } from '@/daily/daily-streaks';
 import SoundSpeedDial from '@/components/sound-speed-dial';
+import FullscreenFab from '@/components/fullscreen-fab';
 
 // --- Title text animation constants ---
 
@@ -682,6 +683,7 @@ export default function Landing() {
 			</Dialog>
 		</Container>
 		<SoundSpeedDial />
+		<FullscreenFab />
 		</motion.div>
 	);
 }
