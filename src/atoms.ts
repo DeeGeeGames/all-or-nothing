@@ -118,6 +118,8 @@ function useFullscreenSync() {
 	const setFullscreen = useSetAtom(fullscreenAtom);
 
 	useEffect(() => {
+		if (window.electronAPI) return;
+
 		function handleFullscreenChange() {
 			setFullscreen(!!document.fullscreenElement);
 		}

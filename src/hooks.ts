@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useMediaQuery } from '@mui/material';
 import useSound from 'use-sound';
 import { useIsSoundEnabled } from './atoms';
 import soundfx from './soundfx.mp3';
 
 export { useInterval } from 'usehooks-ts';
+
+export function useIsMobilePwa() {
+	return useMediaQuery('(display-mode: standalone) and (pointer: coarse)');
+}
 
 export function useActivationGuard(handler: () => void) {
 	const isActivatingRef = useRef(false);

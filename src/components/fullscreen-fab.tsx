@@ -4,14 +4,17 @@ import {
 	FullscreenExit as FullscreenExitIcon,
 } from '@mui/icons-material';
 import { useIsFullscreen, useSetFullscreen, useActiveController } from '@/atoms';
+import { useIsMobilePwa } from '@/hooks';
 
 export default
 function FullscreenFab() {
 	const isFullscreen = useIsFullscreen();
 	const setFullscreen = useSetFullscreen();
 	const activeController = useActiveController();
+	const isMobilePwa = useIsMobilePwa();
 
 	if (activeController !== null) return null;
+	if (isMobilePwa) return null;
 
 	return (
 		<Fab

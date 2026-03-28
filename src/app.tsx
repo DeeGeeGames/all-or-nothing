@@ -76,11 +76,8 @@ function App() {
 
 	useEffect(() => {
 		loadAudioSettings();
-	}, [loadAudioSettings]);
-
-	useEffect(() => {
 		loadFullscreenSetting();
-	}, [loadFullscreenSetting]);
+	}, [loadAudioSettings, loadFullscreenSetting]);
 
 	const actionHandlers = useMemo(() => ({
 		[PrimaryInputAction.NAVIGATE_UP]: () => navigate(NavigationDirection.UP),

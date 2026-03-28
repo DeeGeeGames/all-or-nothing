@@ -24,6 +24,7 @@ import {
 } from '@mui/icons-material';
 import HelpDialogTrigger from './help-dialog-trigger';
 import { useCallback } from 'react';
+import { useIsMobilePwa } from '@/hooks';
 import FocusableButton from '@/components/focusable-button';
 import SharedPauseDialog from '@/components/shared-pause-dialog';
 
@@ -39,6 +40,7 @@ function PauseDialog() {
 	const setIsMusicEnabled = useSetIsMusicEnabled();
 	const isFullscreen = useIsFullscreen();
 	const setFullscreen = useSetFullscreen();
+	const isMobilePwa = useIsMobilePwa();
 
 	const handleUnpause = useCallback(async () => {
 		await resetComboState();
@@ -117,19 +119,21 @@ function PauseDialog() {
 			>
 				Music: {isMusicEnabled ? 'On' : 'Off'}
 			</FocusableButton>
-			<FocusableButton
-				id="pause-fullscreen"
-				group={FOCUS_GROUP}
-				order={5}
-				startIcon={isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-				onClick={handleToggleFullscreen}
-			>
-				Fullscreen: {isFullscreen ? 'On' : 'Off'}
-			</FocusableButton>
+			{!isMobilePwa && (
+				<FocusableButton
+					id="pause-fullscreen"
+					group={FOCUS_GROUP}
+					order={5}
+					startIcon={isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+					onClick={handleToggleFullscreen}
+				>
+					Fullscreen: {isFullscreen ? 'On' : 'Off'}
+				</FocusableButton>
+			)}
 			<FocusableButton
 				id="pause-back"
 				group={FOCUS_GROUP}
-				order={6}
+				order={5}
 				startIcon={<BackIcon />}
 				onClick={handleBackToTitle}
 			>
