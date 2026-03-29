@@ -22,6 +22,7 @@ import {
 	Groups as GroupsIcon,
 	Today as TodayIcon,
 	ExitToApp as ExitToAppIcon,
+	BarChart as BarChartIcon,
 } from '@mui/icons-material';
 import {
 	Container,
@@ -107,7 +108,7 @@ const buttonVariants = {
 	},
 } as const;
 
-const MAX_MENU_BUTTONS = 9;
+const MAX_MENU_BUTTONS = 10;
 const MENU_ANIM_DURATION_MS = (
 	buttonContainerVariants.visible.transition.delayChildren +
 	buttonContainerVariants.visible.transition.staggerChildren * (MAX_MENU_BUTTONS - 1) +
@@ -324,6 +325,10 @@ export default function Landing() {
 
 	const handleLeaderboard = useCallback(() => {
 		setActiveScreen(Screens.Leaderboard);
+	}, [setActiveScreen]);
+
+	const handleStats = useCallback(() => {
+		setActiveScreen(Screens.Stats);
 	}, [setActiveScreen]);
 
 	const handleHowToPlay = useCallback(() => {
@@ -550,9 +555,20 @@ export default function Landing() {
 					)}
 					<motion.div variants={buttonVariants}>
 						<FocusableButton
-							id="menu-tutorial"
+							id="menu-stats"
 							group="menu"
 							order={showLeaderboard ? 5 : 4}
+							startIcon={<BarChartIcon />}
+							onClick={handleStats}
+						>
+							Stats
+						</FocusableButton>
+					</motion.div>
+					<motion.div variants={buttonVariants}>
+						<FocusableButton
+							id="menu-tutorial"
+							group="menu"
+							order={showLeaderboard ? 6 : 5}
 							startIcon={<SchoolIcon />}
 							onClick={handleTutorial}
 						>
@@ -563,7 +579,7 @@ export default function Landing() {
 						<FocusableButton
 							id="menu-how-to-play"
 							group="menu"
-							order={showLeaderboard ? 6 : 5}
+							order={showLeaderboard ? 7 : 6}
 							startIcon={<QuestionMarkIcon />}
 							onClick={handleHowToPlay}
 						>
@@ -574,7 +590,7 @@ export default function Landing() {
 						<FocusableButton
 							id="menu-about"
 							group="menu"
-							order={showLeaderboard ? 7 : 6}
+							order={showLeaderboard ? 8 : 7}
 							startIcon={<InfoIcon />}
 							onClick={handleAbout}
 						>
@@ -586,7 +602,7 @@ export default function Landing() {
 							<FocusableButton
 								id="menu-quit"
 								group="menu"
-								order={showLeaderboard ? 8 : 7}
+								order={showLeaderboard ? 9 : 8}
 								startIcon={<ExitToAppIcon />}
 								onClick={handleQuit}
 							>

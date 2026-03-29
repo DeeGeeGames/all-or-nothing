@@ -52,6 +52,7 @@
 		"vite-plugin-svgr": "^4.5.0"
 	},
 	"dependencies": {
+		"recharts": "^3.8.1",
 		"steamworks-ffi-node": "^0.10.0"
 	}
 }
