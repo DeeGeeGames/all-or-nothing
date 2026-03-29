@@ -41,6 +41,7 @@ const config: Configuration = {
 	},
 	win: {
 		target: ['nsis', 'zip'],
+		icon: 'public/assets/icon.ico',
 	},
 	nsis: {
 		oneClick: true,
