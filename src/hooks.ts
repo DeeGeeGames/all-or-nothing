@@ -7,7 +7,7 @@ import soundfx from './soundfx.mp3';
 export { useInterval } from 'usehooks-ts';
 
 export function useIsMobilePwa() {
-	return useMediaQuery('(display-mode: standalone) and (pointer: coarse)');
+	return useMediaQuery('(display-mode: standalone) and (hover: none)');
 }
 
 export function useActivationGuard(handler: () => void) {
