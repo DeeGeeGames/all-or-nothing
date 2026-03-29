@@ -60,10 +60,20 @@ export function createSteamPlatformService(): PlatformService {
 				const parsed: unknown = JSON.parse(json);
 				if (
 					typeof parsed !== 'object' ||
-					parsed === null ||
-					(parsed as { version?: unknown }).version !== 1
+					parsed === null
 				) return null;
-				return parsed as GameSaveData;
+				const version = (parsed as { version?: unknown }).version;
+				if (version === 1) {
+					const v1 = parsed as Record<string, unknown>;
+					return {
+						...v1,
+						version: 1,
+						misses: 0,
+						fastestScore: 0,
+					} as GameSaveData;
+				}
+				if (version === 2) return parsed as GameSaveData;
+				return null;
 			} catch {
 				return null;
 			}

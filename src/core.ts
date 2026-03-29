@@ -1,7 +1,8 @@
 import { moveAndOverwriteItem, randomizeArray } from './utils';
 import Dexie, { EntityTable } from 'dexie';
 import {
-	DbCollectionItemNameGameDataShuffleCount,
+	DbCollectionItemNameGameDataMisses,
+	DbCollectionItemNameGameDataFastestScore,
 	DbCollectionItemNameGameDataTime,
 	DbCollectionItemNameGameDataSoundEnabled,
 	DbCollectionItemNameGameDataMusicEnabled,
@@ -16,6 +17,19 @@ import {
 	SavedGameKey,
 } from './constants';
 import type { GameCompletionData, GameSaveData } from './platform/types';
+
+export
+interface GameHistoryEntry {
+	readonly id: string;
+	readonly completedAt: number;
+	readonly score: number;
+	readonly time: number;
+	readonly maxCombo: number;
+	readonly remainingCards: number;
+	readonly setsFound: number;
+	readonly misses: number;
+	readonly fastestScore: number;
+}
 import {
 	BitwiseValue,
 	Card,
@@ -146,7 +160,11 @@ const db = new Dexie(DbName) as Dexie & {
 	gamedata: EntityTable<
 		{id: string; value: number;},
 		'id'
-	>
+	>;
+	gamehistory: EntityTable<
+		GameHistoryEntry,
+		'id'
+	>;
 };
 await initDb();
 
@@ -155,11 +173,24 @@ function getDb() {
 	return db;
 }
 
-async function initDb() {;
-// Schema declaration:
+async function initDb() {
 	db.version(1).stores({
-		setorders: '++name, order', // primary key "id" (for the runtime!)
+		setorders: '++name, order',
 		gamedata: '++id, value',
+	});
+
+	db.version(2).stores({
+		setorders: '++name, order',
+		gamedata: '++id, value',
+		gamehistory: '++id, completedAt',
+	}).upgrade(async tx => {
+		const gamedata = tx.table('gamedata');
+		const oldEntry = await gamedata.get('shuffle-count');
+		await gamedata.add({ id: DbCollectionItemNameGameDataMisses, value: 0 });
+		await gamedata.add({ id: DbCollectionItemNameGameDataFastestScore, value: 0 });
+		if (oldEntry) {
+			await gamedata.delete('shuffle-count');
+		}
 	});
 
 	if(await db.setorders.get(DbCollectionItemNameSetOrdersDeck)) {
@@ -179,7 +210,7 @@ async function initDb() {;
 			value: 0,
 		}),
 		db.gamedata.add({
-			id: DbCollectionItemNameGameDataShuffleCount,
+			id: DbCollectionItemNameGameDataMisses,
 			value: 0,
 		}),
 		db.gamedata.add({
@@ -210,6 +241,10 @@ async function initDb() {;
 			id: DbCollectionItemNameGameDataMaxCombo,
 			value: 0,
 		}),
+		db.gamedata.add({
+			id: DbCollectionItemNameGameDataFastestScore,
+			value: 0,
+		}),
 		db.setorders.add({
 			name: DbCollectionItemNameSetOrdersDeck,
 			order: generateDeck(),
@@ -226,12 +261,13 @@ async function resetGameCore() {
 	localStorage.removeItem(SavedGameKey);
 	await Promise.all([
 		db.gamedata.update(DbCollectionItemNameGameDataTime, { value: 0 }),
-		db.gamedata.update(DbCollectionItemNameGameDataShuffleCount, { value: 0 }),
+		db.gamedata.update(DbCollectionItemNameGameDataMisses, { value: 0 }),
 		db.gamedata.update(DbCollectionItemNameGameDataScore, { value: 0 }),
 		db.gamedata.update(DbCollectionItemNameGameDataScoreValue, { value: SCORE_CONFIG.BASE_VALUE }),
 		db.gamedata.update(DbCollectionItemNameGameDataLastMatchTime, { value: 0 }),
 		db.gamedata.update(DbCollectionItemNameGameDataComboCount, { value: 0 }),
 		db.gamedata.update(DbCollectionItemNameGameDataMaxCombo, { value: 0 }),
+		db.gamedata.update(DbCollectionItemNameGameDataFastestScore, { value: 0 }),
 		db.setorders.update(DbCollectionItemNameSetOrdersDeck, { order: generateDeck() }),
 		db.setorders.update(DbCollectionItemNameSetOrdersDiscard, { order: [] }),
 	])
@@ -247,30 +283,32 @@ async function resetComboState() {
 
 export
 async function exportGameState(): Promise<GameSaveData> {
-	const [deck, discard, time, shuffleCount, score, scoreValue, lastMatchTime, comboCount, maxCombo] =
+	const [deck, discard, time, misses, score, scoreValue, lastMatchTime, comboCount, maxCombo, fastestScore] =
 		await Promise.all([
 			db.setorders.get(DbCollectionItemNameSetOrdersDeck),
 			db.setorders.get(DbCollectionItemNameSetOrdersDiscard),
 			db.gamedata.get(DbCollectionItemNameGameDataTime),
-			db.gamedata.get(DbCollectionItemNameGameDataShuffleCount),
+			db.gamedata.get(DbCollectionItemNameGameDataMisses),
 			db.gamedata.get(DbCollectionItemNameGameDataScore),
 			db.gamedata.get(DbCollectionItemNameGameDataScoreValue),
 			db.gamedata.get(DbCollectionItemNameGameDataLastMatchTime),
 			db.gamedata.get(DbCollectionItemNameGameDataComboCount),
 			db.gamedata.get(DbCollectionItemNameGameDataMaxCombo),
+			db.gamedata.get(DbCollectionItemNameGameDataFastestScore),
 		]);
 	return {
-		version: 1,
+		version: 2,
 		savedAt: Date.now(),
 		deck: deck?.order ?? [],
 		discard: discard?.order ?? [],
 		time: time?.value ?? 0,
-		shuffleCount: shuffleCount?.value ?? 0,
+		misses: misses?.value ?? 0,
 		score: score?.value ?? 0,
 		scoreValue: scoreValue?.value ?? SCORE_CONFIG.BASE_VALUE,
 		lastMatchTime: lastMatchTime?.value ?? 0,
 		comboCount: comboCount?.value ?? 0,
 		maxCombo: maxCombo?.value ?? 0,
+		fastestScore: fastestScore?.value ?? 0,
 	};
 }
 
@@ -280,7 +318,8 @@ async function importGameState(data: GameSaveData): Promise<void> {
 		db.setorders.update(DbCollectionItemNameSetOrdersDeck, { order: [...data.deck] }),
 		db.setorders.update(DbCollectionItemNameSetOrdersDiscard, { order: [...data.discard] }),
 		db.gamedata.update(DbCollectionItemNameGameDataTime, { value: data.time }),
-		db.gamedata.update(DbCollectionItemNameGameDataShuffleCount, { value: data.shuffleCount }),
+		db.gamedata.update(DbCollectionItemNameGameDataMisses, { value: data.misses }),
+		db.gamedata.update(DbCollectionItemNameGameDataFastestScore, { value: data.fastestScore }),
 		db.gamedata.update(DbCollectionItemNameGameDataScore, { value: data.score }),
 		db.gamedata.update(DbCollectionItemNameGameDataScoreValue, { value: data.scoreValue }),
 		db.gamedata.update(DbCollectionItemNameGameDataLastMatchTime, { value: data.lastMatchTime }),
@@ -363,15 +402,16 @@ async function updateMusicEnabled(enabled: boolean) {
 export
 async function awardMatchScore(currentTime: number) {
 	return db.transaction('rw', db.gamedata, async () => {
-		const [scoreData, scoreValueData, lastMatchData, comboData, maxComboData] = await Promise.all([
+		const [scoreData, scoreValueData, lastMatchData, comboData, maxComboData, fastestScoreData] = await Promise.all([
 			db.gamedata.get(DbCollectionItemNameGameDataScore),
 			db.gamedata.get(DbCollectionItemNameGameDataScoreValue),
 			db.gamedata.get(DbCollectionItemNameGameDataLastMatchTime),
 			db.gamedata.get(DbCollectionItemNameGameDataComboCount),
 			db.gamedata.get(DbCollectionItemNameGameDataMaxCombo),
+			db.gamedata.get(DbCollectionItemNameGameDataFastestScore),
 		]);
 
-		if (!(scoreData && scoreValueData && lastMatchData && comboData && maxComboData)) {
+		if (!(scoreData && scoreValueData && lastMatchData && comboData && maxComboData && fastestScoreData)) {
 			return null;
 		}
 
@@ -385,13 +425,22 @@ async function awardMatchScore(currentTime: number) {
 			newComboCount
 		);
 
-		await Promise.all([
+		const scoreDelta = currentTime - lastMatchData.value;
+		const currentFastest = fastestScoreData.value;
+		const newFastestScore = currentFastest === 0
+			? scoreDelta
+			: Math.min(currentFastest, scoreDelta);
+
+		const writes: Promise<unknown>[] = [
 			db.gamedata.update(DbCollectionItemNameGameDataScore, { value: newScore }),
 			db.gamedata.update(DbCollectionItemNameGameDataScoreValue, { value: newScoreValue }),
 			db.gamedata.update(DbCollectionItemNameGameDataLastMatchTime, { value: currentTime }),
 			db.gamedata.update(DbCollectionItemNameGameDataComboCount, { value: newComboCount }),
 			db.gamedata.update(DbCollectionItemNameGameDataMaxCombo, { value: newMaxCombo }),
-		]);
+			db.gamedata.update(DbCollectionItemNameGameDataFastestScore, { value: newFastestScore }),
+		];
+
+		await Promise.all(writes);
 
 		return { pointsAwarded: currentScoreValue, comboCount: newComboCount, maxCombo: newMaxCombo };
 	});
@@ -400,17 +449,21 @@ async function awardMatchScore(currentTime: number) {
 export
 async function penalizeInvalidSet() {
 	return db.transaction('rw', db.gamedata, async () => {
-		const scoreValueData = await db.gamedata.get(DbCollectionItemNameGameDataScoreValue);
+		const [scoreValueData, missesData] = await Promise.all([
+			db.gamedata.get(DbCollectionItemNameGameDataScoreValue),
+			db.gamedata.get(DbCollectionItemNameGameDataMisses),
+		]);
 
-		if (!scoreValueData) {
+		if (!(scoreValueData && missesData)) {
 			return null;
 		}
 
 		const newValue = applyPenalty(scoreValueData.value, SCORE_CONFIG.INVALID_SET_PENALTY);
 
-		await db.gamedata.update(DbCollectionItemNameGameDataScoreValue, {
-			value: newValue,
-		});
+		await Promise.all([
+			db.gamedata.update(DbCollectionItemNameGameDataScoreValue, { value: newValue }),
+			db.gamedata.update(DbCollectionItemNameGameDataMisses, { value: missesData.value + 1 }),
+		]);
 
 		return SCORE_CONFIG.INVALID_SET_PENALTY;
 	});
@@ -419,17 +472,21 @@ async function penalizeInvalidSet() {
 export
 async function penalizeUnnecessaryShuffle() {
 	return db.transaction('rw', db.gamedata, async () => {
-		const scoreValueData = await db.gamedata.get(DbCollectionItemNameGameDataScoreValue);
+		const [scoreValueData, missesData] = await Promise.all([
+			db.gamedata.get(DbCollectionItemNameGameDataScoreValue),
+			db.gamedata.get(DbCollectionItemNameGameDataMisses),
+		]);
 
-		if (!scoreValueData) {
+		if (!(scoreValueData && missesData)) {
 			return null;
 		}
 
 		const newValue = applyPenalty(scoreValueData.value, SCORE_CONFIG.SHUFFLE_WITH_SET_PENALTY);
 
-		await db.gamedata.update(DbCollectionItemNameGameDataScoreValue, {
-			value: newValue,
-		});
+		await Promise.all([
+			db.gamedata.update(DbCollectionItemNameGameDataScoreValue, { value: newValue }),
+			db.gamedata.update(DbCollectionItemNameGameDataMisses, { value: missesData.value + 1 }),
+		]);
 
 		return SCORE_CONFIG.SHUFFLE_WITH_SET_PENALTY;
 	});
@@ -437,22 +494,14 @@ async function penalizeUnnecessaryShuffle() {
 
 export
 async function shuffleDeck() {
-	await db.transaction('rw', [db.setorders, db.gamedata], async () => {
-		const deck = await db.setorders.get(DbCollectionItemNameSetOrdersDeck);
-		const shuffleCount = await db.gamedata.get(DbCollectionItemNameGameDataShuffleCount);
+	const deck = await db.setorders.get(DbCollectionItemNameSetOrdersDeck);
 
-		if(!(deck && shuffleCount)) {
-			return;
-		}
+	if (!deck) {
+		return;
+	}
 
-		await Promise.all([
-			db.setorders.update(DbCollectionItemNameSetOrdersDeck, {
-				order: randomizeArray(deck.order),
-			}),
-			db.gamedata.update(DbCollectionItemNameGameDataShuffleCount, {
-				value: shuffleCount.value + 1,
-			}),
-		]);
+	await db.setorders.update(DbCollectionItemNameSetOrdersDeck, {
+		order: randomizeArray(deck.order),
 	});
 }
 
@@ -518,4 +567,32 @@ async function getGameCompletionData(): Promise<GameCompletionData> {
 		time: timeData?.value ?? 0,
 		maxCombo: maxComboData?.value ?? 0,
 	};
+}
+
+export
+async function recordGameCompletion(remainingCards: number): Promise<GameHistoryEntry> {
+	const [scoreData, timeData, maxComboData, missesData, fastestScoreData, discardPile] = await Promise.all([
+		db.gamedata.get(DbCollectionItemNameGameDataScore),
+		db.gamedata.get(DbCollectionItemNameGameDataTime),
+		db.gamedata.get(DbCollectionItemNameGameDataMaxCombo),
+		db.gamedata.get(DbCollectionItemNameGameDataMisses),
+		db.gamedata.get(DbCollectionItemNameGameDataFastestScore),
+		db.setorders.get(DbCollectionItemNameSetOrdersDiscard),
+	]);
+
+	const entry: GameHistoryEntry = {
+		id: crypto.randomUUID(),
+		completedAt: Date.now(),
+		score: scoreData?.value ?? 0,
+		time: timeData?.value ?? 0,
+		maxCombo: maxComboData?.value ?? 0,
+		remainingCards,
+		setsFound: Math.floor((discardPile?.order.length ?? 0) / 3),
+		misses: missesData?.value ?? 0,
+		fastestScore: fastestScoreData?.value ?? 0,
+	};
+
+	await db.gamehistory.add(entry);
+
+	return entry;
 }

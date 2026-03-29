@@ -3,7 +3,8 @@ import { getDb } from '@/core';
 import { Card } from '@/types';
 import {
 	DbCollectionItemNameGameDataTime,
-	DbCollectionItemNameGameDataShuffleCount,
+	DbCollectionItemNameGameDataMisses,
+	DbCollectionItemNameGameDataFastestScore,
 	DbCollectionItemNameGameDataScore,
 	DbCollectionItemNameGameDataScoreValue,
 	DbCollectionItemNameGameDataComboCount,
@@ -24,8 +25,12 @@ export function useTime() {
 	return useLiveQuery(() => db.gamedata.get(DbCollectionItemNameGameDataTime))?.value || 0;
 }
 
-export function useShuffleCount() {
-	return useLiveQuery(() => db.gamedata.get(DbCollectionItemNameGameDataShuffleCount))?.value || 0;
+export function useMisses() {
+	return useLiveQuery(() => db.gamedata.get(DbCollectionItemNameGameDataMisses))?.value || 0;
+}
+
+export function useFastestScore() {
+	return useLiveQuery(() => db.gamedata.get(DbCollectionItemNameGameDataFastestScore))?.value || 0;
 }
 
 export function useDeckOrder() {

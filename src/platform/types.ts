@@ -44,12 +44,13 @@ interface GameCompletionData {
 
 export
 interface GameSaveData {
-	readonly version: 1;
+	readonly version: 1 | 2;
 	readonly savedAt: number;
 	readonly deck: readonly string[];
 	readonly discard: readonly string[];
 	readonly time: number;
-	readonly shuffleCount: number;
+	readonly misses: number;
+	readonly fastestScore: number;
 	readonly score: number;
 	readonly scoreValue: number;
 	readonly lastMatchTime: number;

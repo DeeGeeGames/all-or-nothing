@@ -12,7 +12,7 @@ import { useConvergenceAnimation } from '@/useConvergenceAnimation';
 import type { ConvergenceData } from '@/useConvergenceAnimation';
 
 interface Props {
-	shuffleCount: number;
+	shuffleGeneration: number;
 	cards: Card[];
 	selectedCards: string[];
 	mismatchingCardIds: string[];
@@ -84,7 +84,7 @@ function FocusableCard({
 export default
 function GameCardArea(props: Props) {
 	const {
-		shuffleCount: rawShffleCount,
+		shuffleGeneration: rawShuffleGeneration,
 		cards: unDebouncedRawCards,
 		paused,
 		selectedCards,
@@ -95,7 +95,7 @@ function GameCardArea(props: Props) {
 		onDiscardAnimationComplete,
 	} = props;
 	const rawCards = useDebouncedValue(unDebouncedRawCards, 100);
-	const [shuffleCount, setShuffleCount] = useState(rawShffleCount);
+	const [shuffleGeneration, setShuffleGeneration] = useState(rawShuffleGeneration);
 	const [cards, setCards] = useState<Card[]>([]);
 	const [newCards, setNewCards] = useState<Card[]>([]);
 	const setActiveGroup = useSetActiveGroup();
@@ -115,7 +115,7 @@ function GameCardArea(props: Props) {
 				insertedCards,
 		);
 
-		setShuffleCount(rawShffleCount);
+		setShuffleGeneration(rawShuffleGeneration);
 	}, [JSON.stringify(rawCards)]);
 
 	useInterval(() => {
@@ -178,7 +178,7 @@ function GameCardArea(props: Props) {
 
 					return (
 						<Grid
-							key={`${shuffleCount}-${card.id}`}
+							key={`${shuffleGeneration}-${card.id}`}
 							component={motion.div}
 							display="flex"
 							justifyContent="center"

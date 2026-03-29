@@ -16,6 +16,7 @@ import {
 	penalizeInvalidSet,
 	penalizeUnnecessaryShuffle,
 	resetComboState,
+	recordGameCompletion,
 } from '@/core';
 import GameTimer from './game-timer';
 import GameScore from './game-score';
@@ -34,7 +35,7 @@ import { getGamepadManager } from '@/input/gamepad-manager';
 import { getKeyboardManager } from '@/input/keyboard-manager';
 import { InputAction, InputEvent } from '@/input/input-types';
 import { BoardCardCount } from '@/constants';
-import { useDeck, useTime, useScore, useShuffleCount, useDeckOrder, useDiscardPile, useMaxCombo } from '@/game-queries';
+import { useDeck, useTime, useScore, useDeckOrder, useDiscardPile, useMaxCombo } from '@/game-queries';
 import { usePlatform } from '@/platform';
 
 const {
@@ -49,7 +50,7 @@ function GamePlayArea() {
 	const score = useScore();
 	const maxCombo = useMaxCombo();
 	const soundEffects = useSoundEffects();
-	const shuffleCount = useShuffleCount();
+	const [shuffleGeneration, setShuffleGeneration] = useState(0);
 	const paused = useIsPaused();
 	const setIsPaused = useSetIsPaused();
 	const [selectedCards, setSelectedCards] = useState<string[]>([]);
@@ -116,6 +117,20 @@ function GamePlayArea() {
 
 		prevDiscardLengthRef.current = currentLength;
 	}, [discardPile?.order.length]);
+
+	// Record game history when a game completes
+	const gameCompletionRecordedRef = useRef(false);
+	useEffect(() => {
+		if (!gameComplete) {
+			gameCompletionRecordedRef.current = false;
+			return;
+		}
+
+		if (gameCompletionRecordedRef.current) return;
+		gameCompletionRecordedRef.current = true;
+
+		recordGameCompletion(dealtCards.length);
+	}, [gameComplete, dealtCards.length]);
 
 	// Keep input handler in a ref so listeners don't need re-registration
 	// when paused/canShuffle/dealtCards change
@@ -203,7 +218,7 @@ function GamePlayArea() {
 				>
 					<GameCardArea
 						key={gameGeneration}
-						shuffleCount={shuffleCount}
+						shuffleGeneration={shuffleGeneration}
 						cards={dealtCards}
 						selectedCards={selectedCards}
 						mismatchingCardIds={mismatchingCards}
@@ -310,6 +325,7 @@ function GamePlayArea() {
 
 		setSelectedCards([]);
 		await shuffleDeck();
+		setShuffleGeneration(g => g + 1);
 		triggerCloudSave();
 	}
 	async function toggleSelected(cardId: string) {
