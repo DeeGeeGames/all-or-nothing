@@ -1,4 +1,5 @@
 import { Typography, TypographyProps } from '@mui/material';
+import { formatDuration } from '@/utils';
 
 interface Props {
 	label: string;
@@ -16,7 +17,7 @@ function FormattedTime(props: Props) {
 
 	return (
 		<Typography variant={variant}>
-			{label} <strong>{value / 60 | 0}:{(value % 60).toString().padStart(2, '0')}</strong>
+			{label} <strong>{formatDuration(value)}</strong>
 		</Typography>
 	);
 }

@@ -27,6 +27,7 @@ import { useScrollable } from '@/focus/useScrollable';
 import { useBackAction } from '@/input/useBackAction';
 import { InputAction } from '@/input/input-types';
 import { ButtonPromptsBar } from '@/components/button-prompts';
+import { formatDuration } from '@/utils';
 import {
 	usePlatform,
 	LeaderboardName,
@@ -40,15 +41,9 @@ const tabConfig = [
 	{ label: 'Combo', icon: <WhatshotIcon />, leaderboard: LeaderboardName.Combo, valueHeader: 'Max Combo' },
 ] as const;
 
-function formatTime(seconds: number): string {
-	const minutes = Math.floor(seconds / 60);
-	const remainingSeconds = seconds % 60;
-	return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
-}
-
 function formatValue(value: number, leaderboard: LeaderboardName): string {
 	if (leaderboard === LeaderboardName.Time) {
-		return formatTime(value);
+		return formatDuration(value);
 	}
 	return value.toLocaleString();
 }

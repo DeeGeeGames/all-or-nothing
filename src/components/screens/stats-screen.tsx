@@ -79,7 +79,7 @@ function StatCard({ label, value, icon }: {
 
 function StatsChart({ title, data, dataKey, avgKey, color, formatValue }: {
 	readonly title: string;
-	readonly data: readonly ChartDataPoint[];
+	readonly data: ChartDataPoint[];
 	readonly dataKey: keyof ChartDataPoint;
 	readonly avgKey: keyof ChartDataPoint;
 	readonly color: string;
@@ -92,7 +92,7 @@ function StatsChart({ title, data, dataKey, avgKey, color, formatValue }: {
 		<Paper sx={{ p: 2, mb: 2 }}>
 			<Typography variant="h6" gutterBottom>{title}</Typography>
 			<ResponsiveContainer width="100%" height={250}>
-				<LineChart data={data as ChartDataPoint[]}>
+				<LineChart data={data}>
 					<CartesianGrid strokeDasharray="3 3" opacity={0.3} />
 					<XAxis dataKey="gameNumber" />
 					<YAxis tickFormatter={(v: number) => formatter(v)} />
@@ -143,7 +143,7 @@ function StatsScreen() {
 	const allChartData = useChartData(history);
 
 	const chartData = useMemo(
-		() => allChartData ? applyRangeFilter(allChartData, rangeFilter) : undefined,
+		() => allChartData ? [...applyRangeFilter(allChartData, rangeFilter)] : [],
 		[allChartData, rangeFilter],
 	);
 
@@ -152,7 +152,7 @@ function StatsScreen() {
 	}, []);
 
 	const hasGames = history !== undefined && history.length > 0;
-	const hasChartData = chartData !== undefined && chartData.length >= 2;
+	const hasChartData = chartData.length >= 2;
 
 	return (
 		<Container sx={{
@@ -236,7 +236,7 @@ function StatsScreen() {
 							/>
 							<StatCard
 								label="Avg Match Speed"
-								value={formatDuration(aggregateStats.averageMatchSpeed)}
+								value={formatDuration(aggregateStats.meanMatchSpeed)}
 								icon={<SpeedIcon />}
 							/>
 						</Box>
@@ -247,7 +247,7 @@ function StatsScreen() {
 							</Typography>
 						)}
 
-						{hasChartData && chartData && (
+						{hasChartData && (
 							<>
 								<Box display="flex" justifyContent="center" mb={2}>
 									<ToggleButtonGroup

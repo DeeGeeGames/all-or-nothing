@@ -1,7 +1,7 @@
 import { useIsPaused } from '@/atoms';
 import { useInterval } from '@/hooks';
 import { performTimerTick } from '@/core';
-import { useTimeout } from '@/utils';
+import { useTimeout, formatDuration } from '@/utils';
 import { useState } from 'react';
 import { useTime } from '@/game-queries';
 import { Box, Typography } from '@mui/material';
@@ -29,9 +29,7 @@ function GameTimer(props: Props) {
 		performTimerTick(newTime);
 	}, runTimer ? 1000 : null);
 
-	const formattedTime = time ?
-		`${time / 60 | 0}:${(time % 60).toString().padStart(2, '0')}`
-		: '0:00';
+	const formattedTime = formatDuration(time);
 
 	return (
 		<Box display="flex" gap={1} alignItems="center">

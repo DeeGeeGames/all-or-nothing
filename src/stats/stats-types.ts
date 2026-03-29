@@ -12,7 +12,7 @@ export interface AggregateStats {
 	readonly accuracy: number;
 	readonly meanScore: number;
 	readonly meanTime: number;
-	readonly averageMatchSpeed: number;
+	readonly meanMatchSpeed: number;
 }
 
 export interface ChartDataPoint {
