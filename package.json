@@ -43,7 +43,7 @@
 		"react": "^19.2.4",
 		"react-dom": "^19.2.4",
 		"react-ga4": "^2.1.0",
-		"typescript": "^5.9.3",
+		"typescript": "^6.0.2",
 		"use-sound": "^5.0.0",
 		"usehooks-ts": "^3.1.1",
 		"vite": "^7.3.1",
