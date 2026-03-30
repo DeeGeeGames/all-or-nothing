@@ -114,10 +114,10 @@ function MenuButtons({
 					<motion.div
 						key={activeMenu}
 						custom={direction}
-						variants={prefersReducedMotion ? undefined : slideVariants}
-						initial={skipSlide ? false : 'enter'}
-						animate="visible"
-						exit="exit"
+						variants={menuAnimDone && !prefersReducedMotion ? slideVariants : undefined}
+						initial={menuAnimDone ? (skipSlide ? false : 'enter') : undefined}
+						animate={menuAnimDone ? 'visible' : undefined}
+						exit={menuAnimDone ? 'exit' : undefined}
 					>
 						<Box display="flex" flexDirection="column" gap={2}>
 							{items.map((item, index) => (
