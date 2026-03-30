@@ -49,71 +49,14 @@ jobs:
           projectId: make-a-set
 
   build_desktop:
+    uses: ./.github/workflows/build-desktop.yml
     permissions:
       id-token: write
       contents: read
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            platform: linux
-            package_cmd: "npx electron-builder --linux --config electron-builder.config.ts"
-            artifact_name: desktop-linux
-            asset_glob: |
-              dist/desktop/*.AppImage
-              dist/desktop/*.flatpak
-            steam_artifact_name: steam-linux
-            steam_artifact_path: dist/desktop/linux-unpacked
-          - os: windows-latest
-            platform: win
-            package_cmd: "npx electron-builder --win --config electron-builder.config.ts"
-            artifact_name: desktop-windows
-            asset_glob: |
-              dist/desktop/*.exe
-              dist/desktop/*.zip
-            steam_artifact_name: steam-windows
-            steam_artifact_path: dist/desktop/win-unpacked
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-      - name: Install Flatpak SDK (Linux only)
-        if: matrix.platform == 'linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder elfutils
-          flatpak remote-add --if-not-exists --user flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08 org.electronjs.Electron2.BaseApp//24.08
-      - run: npm ci
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
-      - name: Download Steamworks SDK
-        run: |
-          aws s3 cp ${{ vars.STEAM_SDK_S3_URI }} .
-          tar xzf steamworks_sdk.tar.gz
-      - name: Sync package.json version from tag
-        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
-        shell: bash
-      - name: Build Electron app
-        run: npm run build:electron
-        env:
-          STEAM_APP_ID: ${{ secrets.STEAM_APP_ID }}
-      - name: Package desktop (${{ matrix.platform }})
-        run: ${{ matrix.package_cmd }}
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.asset_glob }}
-      - name: Upload unpacked build for Steam
-        uses: actions/upload-artifact@v7
-        with:
-          name: ${{ matrix.steam_artifact_name }}
-          path: ${{ matrix.steam_artifact_path }}
+    with:
+      version: ${{ github.ref_name }}
+      is-release: true
+    secrets: inherit
 
   create_release:
     needs: build_desktop
@@ -136,7 +79,7 @@ jobs:
           files: release-assets/*
 
   deploy_itchio:
-    needs: [build_web, build_desktop, create_release]
+    needs: [build_web, build_desktop]
     runs-on: ubuntu-latest
     env:
       BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
@@ -175,36 +118,11 @@ jobs:
 
   deploy_steam:
     needs: build_desktop
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          sparse-checkout: steam
-      - name: Download Windows build
-        uses: actions/download-artifact@v8
-        with:
-          name: steam-windows
-          path: builds/windows
-      - name: Download Linux build
-        uses: actions/download-artifact@v8
-        with:
-          name: steam-linux
-          path: builds/linux
-      - name: Bundle Steam Input controller config
-        run: |
-          cp -r steam/controller_config builds/windows/controller_config
-          cp -r steam/controller_config builds/linux/controller_config
-      - uses: game-ci/steam-deploy@v3
-        with:
-          username: ${{ secrets.STEAM_USERNAME }}
-          configVdf: ${{ secrets.STEAM_CONFIG_VDF }}
-          appId: ${{ secrets.STEAM_APP_ID }}
-          buildDescription: ${{ github.ref_name }}
-          rootPath: builds
-          depot1Path: windows
-          depot2Path: linux
-          depot2InstallScriptPath: steam/install_script_linux.vdf
-          releaseBranch: prerelease
+    uses: ./.github/workflows/deploy-steam.yml
+    with:
+      build-description: ${{ github.ref_name }}
+      release-branch: default
+    secrets: inherit
 
   sync_version:
     needs: [deploy_firebase, deploy_itchio, deploy_steam]
@@ -223,5 +141,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add package.json package-lock.json
           git diff --staged --quiet && echo "package.json already up to date" && exit 0
-          git commit -m "chore: sync version to ${GITHUB_REF_NAME}"
+          git commit -m "chore: sync version to ${GITHUB_REF_NAME} [skip ci]"
           git push origin master

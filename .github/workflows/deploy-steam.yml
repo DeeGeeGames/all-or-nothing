@@ -1,0 +1,42 @@
+name: Deploy to Steam
+
+on:
+  workflow_call:
+    inputs:
+      build-description:
+        description: Build description shown in Steamworks
+        type: string
+        required: true
+      release-branch:
+        description: Steam branch to deploy to (e.g. default, prerelease)
+        type: string
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: steam
+      - name: Download Windows build
+        uses: actions/download-artifact@v8
+        with:
+          name: steam-windows
+          path: builds/windows
+      - name: Download Linux build
+        uses: actions/download-artifact@v8
+        with:
+          name: steam-linux
+          path: builds/linux
+      - uses: game-ci/steam-deploy@v3
+        with:
+          username: ${{ secrets.STEAM_USERNAME }}
+          configVdf: ${{ secrets.STEAM_CONFIG_VDF }}
+          appId: ${{ secrets.STEAM_APP_ID }}
+          buildDescription: ${{ inputs.build-description }}
+          rootPath: builds
+          depot1Path: windows
+          depot2Path: linux
+          depot2InstallScriptPath: steam/install_script_linux.vdf
+          releaseBranch: ${{ inputs.release-branch }}

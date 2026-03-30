@@ -1,0 +1,89 @@
+name: Build Desktop
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Version to set in package.json (e.g. v1.2.3, leading v is stripped)
+        type: string
+        default: ''
+      is-release:
+        description: Build all targets (including Flatpak) and upload release artifacts
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            package_cmd: >-
+              npx electron-builder --linux
+              ${{ !inputs.is-release && 'AppImage' || '' }}
+              --config electron-builder.config.ts
+            release_artifact_name: desktop-linux
+            release_artifact_glob: |
+              dist/desktop/*.AppImage
+              dist/desktop/*.flatpak
+            steam_artifact_name: steam-linux
+            steam_artifact_path: dist/desktop/linux-unpacked
+          - os: windows-latest
+            platform: win
+            package_cmd: npx electron-builder --win --config electron-builder.config.ts
+            release_artifact_name: desktop-windows
+            release_artifact_glob: |
+              dist/desktop/*.exe
+              dist/desktop/*.zip
+            steam_artifact_name: steam-windows
+            steam_artifact_path: dist/desktop/win-unpacked
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install Flatpak SDK
+        if: inputs.is-release && matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder elfutils
+          flatpak remote-add --if-not-exists --user flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08 org.electronjs.Electron2.BaseApp//24.08
+      - run: npm ci
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Download Steamworks SDK
+        run: |
+          aws s3 cp ${{ vars.STEAM_SDK_S3_URI }} .
+          tar xzf steamworks_sdk.tar.gz
+      - name: Sync package.json version
+        if: inputs.version != ''
+        run: npm version "${VERSION#v}" --no-git-tag-version --allow-same-version
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+      - name: Build Electron app
+        run: npm run build:electron
+        env:
+          STEAM_APP_ID: ${{ secrets.STEAM_APP_ID }}
+      - name: Package desktop (${{ matrix.platform }})
+        run: ${{ matrix.package_cmd }}
+      - name: Upload release artifacts
+        if: inputs.is-release
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.release_artifact_name }}
+          path: ${{ matrix.release_artifact_glob }}
+      - name: Upload unpacked build for Steam
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.steam_artifact_name }}
+          path: ${{ matrix.steam_artifact_path }}

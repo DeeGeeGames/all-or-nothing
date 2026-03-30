@@ -6,8 +6,13 @@ on:
   pull_request:
     branches: [master]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate_web:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -19,6 +24,7 @@ jobs:
       - run: npm run build
 
   validate_electron:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -30,7 +36,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
@@ -43,7 +49,6 @@ jobs:
           STEAM_APP_ID: ${{ secrets.STEAM_APP_ID }}
 
   deploy_firebase_preview:
-    needs: validate_web
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
@@ -62,3 +67,19 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_MAKE_A_SET }}
           channelId: preview
           projectId: make-a-set
+
+  build_desktop:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    uses: ./.github/workflows/build-desktop.yml
+    permissions:
+      id-token: write
+      contents: read
+    secrets: inherit
+
+  deploy_steam:
+    needs: build_desktop
+    uses: ./.github/workflows/deploy-steam.yml
+    with:
+      build-description: unstable-${{ github.sha }}
+      release-branch: prerelease
+    secrets: inherit
