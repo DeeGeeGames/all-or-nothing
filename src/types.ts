@@ -28,6 +28,7 @@ const Screens = {
 	Multiplayer: 'multiplayer',
 	Daily: 'daily',
 	Stats: 'stats',
+	Achievements: 'achievements',
 } as const;
 
 export

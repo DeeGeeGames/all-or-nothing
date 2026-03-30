@@ -382,6 +382,15 @@ export function registerSteamHandlers(appId: number) {
 		shutdownSteamInput();
 	});
 
+	ipcMain.handle('steam:activateAchievement', async (_event, achievementId: string) => {
+		if (!steamInitialized) return false;
+		try {
+			return await steam.achievements.unlockAchievement(achievementId);
+		} catch {
+			return false;
+		}
+	});
+
 	ipcMain.handle('steam:cloudSave', (_event, json: string) => {
 		debugLog(`cloudSave: initialized=${steamInitialized}, accountCloud=${steamInitialized && steam.cloud.isCloudEnabledForAccount()}, appCloud=${steamInitialized && steam.cloud.isCloudEnabledForApp()}, bytes=${json.length}`);
 		if (!steamInitialized || !isCloudAvailable()) return false;

@@ -17,6 +17,7 @@ import {
 	SavedGameKey,
 } from './constants';
 import type { GameCompletionData, GameSaveData } from './platform/types';
+import type { UnlockedAchievement } from './achievements/achievement-types';
 
 export
 interface GameHistoryEntry {
@@ -165,6 +166,10 @@ const db = new Dexie(DbName) as Dexie & {
 		GameHistoryEntry,
 		'id'
 	>;
+	achievements: EntityTable<
+		UnlockedAchievement,
+		'id'
+	>;
 };
 await initDb();
 
@@ -191,6 +196,13 @@ async function initDb() {
 		if (oldEntry) {
 			await gamedata.delete('shuffle-count');
 		}
+	});
+
+	db.version(3).stores({
+		setorders: '++name, order',
+		gamedata: '++id, value',
+		gamehistory: '++id, completedAt',
+		achievements: '++id, unlockedAt',
 	});
 
 	if(await db.setorders.get(DbCollectionItemNameSetOrdersDeck)) {
@@ -283,7 +295,7 @@ async function resetComboState() {
 
 export
 async function exportGameState(): Promise<GameSaveData> {
-	const [deck, discard, time, misses, score, scoreValue, lastMatchTime, comboCount, maxCombo, fastestScore] =
+	const [deck, discard, time, misses, score, scoreValue, lastMatchTime, comboCount, maxCombo, fastestScore, achievements] =
 		await Promise.all([
 			db.setorders.get(DbCollectionItemNameSetOrdersDeck),
 			db.setorders.get(DbCollectionItemNameSetOrdersDiscard),
@@ -295,9 +307,10 @@ async function exportGameState(): Promise<GameSaveData> {
 			db.gamedata.get(DbCollectionItemNameGameDataComboCount),
 			db.gamedata.get(DbCollectionItemNameGameDataMaxCombo),
 			db.gamedata.get(DbCollectionItemNameGameDataFastestScore),
+			db.achievements.toArray(),
 		]);
 	return {
-		version: 2,
+		version: 3,
 		savedAt: Date.now(),
 		deck: deck?.order ?? [],
 		discard: discard?.order ?? [],
@@ -309,6 +322,7 @@ async function exportGameState(): Promise<GameSaveData> {
 		comboCount: comboCount?.value ?? 0,
 		maxCombo: maxCombo?.value ?? 0,
 		fastestScore: fastestScore?.value ?? 0,
+		achievements: achievements.map(a => ({ id: a.id, unlockedAt: a.unlockedAt })),
 	};
 }
 
@@ -327,6 +341,19 @@ async function importGameState(data: GameSaveData): Promise<void> {
 		db.gamedata.update(DbCollectionItemNameGameDataMaxCombo, { value: data.maxCombo }),
 	]);
 	localStorage.setItem(SavedGameKey, String(data.time));
+
+	if (data.achievements) {
+		const existing = await db.achievements.toArray();
+		const existingIds = new Set(existing.map(a => a.id));
+
+		const newAchievements = data.achievements
+			.filter(a => !existingIds.has(a.id))
+			.map(a => ({ id: a.id, unlockedAt: a.unlockedAt }));
+
+		if (newAchievements.length > 0) {
+			await db.achievements.bulkAdd(newAchievements);
+		}
+	}
 }
 
 export
@@ -594,5 +621,12 @@ async function recordGameCompletion(remainingCards: number): Promise<GameHistory
 
 	await db.gamehistory.add(entry);
 
+	return entry;
+}
+
+export
+async function unlockAchievement(id: string): Promise<UnlockedAchievement> {
+	const entry: UnlockedAchievement = { id, unlockedAt: Date.now() };
+	await db.achievements.add(entry);
 	return entry;
 }

@@ -44,7 +44,7 @@ interface GameCompletionData {
 
 export
 interface GameSaveData {
-	readonly version: 1 | 2;
+	readonly version: 1 | 2 | 3;
 	readonly savedAt: number;
 	readonly deck: readonly string[];
 	readonly discard: readonly string[];
@@ -56,6 +56,7 @@ interface GameSaveData {
 	readonly lastMatchTime: number;
 	readonly comboCount: number;
 	readonly maxCombo: number;
+	readonly achievements?: readonly { readonly id: string; readonly unlockedAt: number }[];
 }
 
 export
@@ -64,6 +65,7 @@ interface PlatformService {
 	submitScore(data: GameCompletionData): Promise<boolean>;
 	fetchLeaderboard(options: LeaderboardFetchOptions): Promise<readonly LeaderboardEntry[]>;
 	getPlayerName(): Promise<string | null>;
+	activateAchievement(achievementId: string): Promise<boolean>;
 	cloudSave(data: GameSaveData): Promise<boolean>;
 	cloudLoad(): Promise<GameSaveData | null>;
 }

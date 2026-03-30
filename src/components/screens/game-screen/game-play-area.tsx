@@ -8,6 +8,7 @@ import GameOverOverlay from './game-over-overlay';
 import {
 	discardCards,
 	exportGameState,
+	getDb,
 	getMismatchedAttributes,
 	isSet,
 	setExists,
@@ -118,7 +119,7 @@ function GamePlayArea() {
 		prevDiscardLengthRef.current = currentLength;
 	}, [discardPile?.order.length]);
 
-	// Record game history when a game completes
+	// Record game history and evaluate achievements when a game completes
 	const gameCompletionRecordedRef = useRef(false);
 	useEffect(() => {
 		if (!gameComplete) {
@@ -129,8 +130,20 @@ function GamePlayArea() {
 		if (gameCompletionRecordedRef.current) return;
 		gameCompletionRecordedRef.current = true;
 
-		recordGameCompletion(dealtCards.length);
-	}, [gameComplete, dealtCards.length]);
+		recordGameCompletion(dealtCards.length).then(async (entry) => {
+			const historyCount = await getDb().gamehistory.count();
+			const { evaluateAchievements } = await import('@/achievements/evaluate-achievements');
+
+			// TODO: [NOTIFICATION_TRIGGER] evaluateAchievements returns newly unlocked
+			// achievements that can be passed to a notification state atom when the
+			// notification system is implemented.
+			await evaluateAchievements(
+				entry,
+				historyCount,
+				(id) => service.activateAchievement(id),
+			);
+		});
+	}, [gameComplete, dealtCards.length, service]);
 
 	// Keep input handler in a ref so listeners don't need re-registration
 	// when paused/canShuffle/dealtCards change

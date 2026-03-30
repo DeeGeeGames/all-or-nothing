@@ -43,6 +43,16 @@ export function createSteamPlatformService(): PlatformService {
 			}
 		},
 
+		async activateAchievement(achievementId: string) {
+			if (!api) return false;
+			try {
+				return await api.activateAchievement(achievementId);
+			} catch {
+				console.warn('Achievement activation failed');
+				return false;
+			}
+		},
+
 		async cloudSave(data: GameSaveData) {
 			if (!api) return false;
 			try {
@@ -72,7 +82,7 @@ export function createSteamPlatformService(): PlatformService {
 						fastestScore: 0,
 					} as GameSaveData;
 				}
-				if (version === 2) return parsed as GameSaveData;
+				if (version === 2 || version === 3) return parsed as GameSaveData;
 				return null;
 			} catch {
 				return null;

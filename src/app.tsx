@@ -36,6 +36,7 @@ const Lobby = lazy(() => import('./components/screens/lobby-screen'));
 const MultiplayerGame = lazy(() => import('./components/screens/multiplayer-game-screen'));
 const Daily = lazy(() => import('./components/screens/daily-screen'));
 const Stats = lazy(() => import('./components/screens/stats-screen'));
+const Achievements = lazy(() => import('./components/screens/achievements-screen'));
 const SplashSequence = lazy(() => import('./components/screens/splash-sequence'));
 
 const ScreenComponents = {
@@ -50,6 +51,7 @@ const ScreenComponents = {
 	[Screens.Multiplayer]: MultiplayerGame,
 	[Screens.Daily]: Daily,
 	[Screens.Stats]: Stats,
+	[Screens.Achievements]: Achievements,
 } as const;
 
 export default

@@ -23,6 +23,7 @@ import {
 	Today as TodayIcon,
 	ExitToApp as ExitToAppIcon,
 	BarChart as BarChartIcon,
+	EmojiEvents as EmojiEventsIcon,
 } from '@mui/icons-material';
 import {
 	Container,
@@ -331,6 +332,10 @@ export default function Landing() {
 		setActiveScreen(Screens.Stats);
 	}, [setActiveScreen]);
 
+	const handleAchievements = useCallback(() => {
+		setActiveScreen(Screens.Achievements);
+	}, [setActiveScreen]);
+
 	const handleHowToPlay = useCallback(() => {
 		setActiveScreen(Screens.Help);
 	}, [setActiveScreen]);
@@ -566,9 +571,20 @@ export default function Landing() {
 					</motion.div>
 					<motion.div variants={buttonVariants}>
 						<FocusableButton
-							id="menu-tutorial"
+							id="menu-achievements"
 							group="menu"
 							order={showLeaderboard ? 6 : 5}
+							startIcon={<EmojiEventsIcon />}
+							onClick={handleAchievements}
+						>
+							Achievements
+						</FocusableButton>
+					</motion.div>
+					<motion.div variants={buttonVariants}>
+						<FocusableButton
+							id="menu-tutorial"
+							group="menu"
+							order={showLeaderboard ? 7 : 6}
 							startIcon={<SchoolIcon />}
 							onClick={handleTutorial}
 						>
@@ -579,7 +595,7 @@ export default function Landing() {
 						<FocusableButton
 							id="menu-how-to-play"
 							group="menu"
-							order={showLeaderboard ? 7 : 6}
+							order={showLeaderboard ? 8 : 7}
 							startIcon={<QuestionMarkIcon />}
 							onClick={handleHowToPlay}
 						>
@@ -590,7 +606,7 @@ export default function Landing() {
 						<FocusableButton
 							id="menu-about"
 							group="menu"
-							order={showLeaderboard ? 8 : 7}
+							order={showLeaderboard ? 9 : 8}
 							startIcon={<InfoIcon />}
 							onClick={handleAbout}
 						>
@@ -602,7 +618,7 @@ export default function Landing() {
 							<FocusableButton
 								id="menu-quit"
 								group="menu"
-								order={showLeaderboard ? 9 : 8}
+								order={showLeaderboard ? 10 : 9}
 								startIcon={<ExitToAppIcon />}
 								onClick={handleQuit}
 							>
