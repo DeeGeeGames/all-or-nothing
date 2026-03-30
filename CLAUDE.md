@@ -20,7 +20,7 @@ npm run typecheck    # Ensure there are not typescript errors
 
 ### State Management
 - **Jotai** is used for global state management (see `src/atoms.ts`)
-- State atoms include: sound/music toggles, active screen, pause state, and toast message queue
+- State atoms include: sound/music toggles, active screen, and pause state
 - Custom hooks in `atoms.ts` provide access to state (e.g., `useActiveScreen()`, `useSetIsSoundEnabled()`)
 
 ### Database Layer
@@ -51,7 +51,7 @@ npm run typecheck    # Ensure there are not typescript errors
   - `game-screen/`: Main game area with nested components (timer, play area, card area, options)
   - `about-screen.tsx`: Information screen
   - `help-screen.tsx`: Help/tutorial content
-- **Reusable components**: Toast notifications, dialogs, sound/music toggles, playing cards
+- **Reusable components**: Dialogs, sound/music toggles, playing cards
 - **Playing cards**: `src/components/playing-card/` renders cards with SVG shapes based on card properties
 
 ### Path Aliases
