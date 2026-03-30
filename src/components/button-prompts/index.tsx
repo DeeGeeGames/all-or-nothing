@@ -55,8 +55,6 @@ export function ButtonPromptsBar({ controllerType, prompts }: ButtonPromptsBarPr
 				gap: 2,
 				flexWrap: 'wrap',
 				p: 1,
-				bgcolor: 'rgba(255, 255, 255, 0.9)',
-				borderRadius: 1,
 			}}
 		>
 			{prompts.map((prompt, index) => (

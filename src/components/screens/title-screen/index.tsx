@@ -1,30 +1,16 @@
-import PlayingCard from '../playing-card';
-import { BitwiseValue, Card, Screens } from '../../types';
-import { resetGame, randomChoice, useTimeout } from '../../utils';
-import { useSetActiveScreen, useActiveController, useSplashComplete, useSetSplashComplete } from '../../atoms';
+import PlayingCard from '@/components/playing-card';
+import { BitwiseValue, Card, Screens } from '@/types';
+import { resetGame, randomChoice, useTimeout } from '@/utils';
+import { useSetActiveScreen, useActiveController, useSplashComplete, useSetSplashComplete } from '@/atoms';
 import { useSetActiveGroup } from '@/focus/focus-atoms';
 import { useGameTheme } from '@/themes';
 import { fireConvergenceConfetti } from '@/confetti';
-import FormattedTime from '../formatted-time';
 import { SavedGameKey, TutorialCompletedKey } from '@/constants';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useGamepadManager, useKeyboardManager, useSteamInputManager } from '@/input/input-hooks';
 import { useEventListener } from 'usehooks-ts';
 import { InputEvent, InputAction } from '@/input/input-types';
 import { motion, useReducedMotion } from 'framer-motion';
-import {
-	RotateLeft as RotateLeftIcon,
-	PlayArrow as PlayArrowIcon,
-	Info as InfoIcon,
-	QuestionMark as QuestionMarkIcon,
-	Leaderboard as LeaderboardIcon,
-	School as SchoolIcon,
-	Groups as GroupsIcon,
-	Today as TodayIcon,
-	ExitToApp as ExitToAppIcon,
-	BarChart as BarChartIcon,
-	EmojiEvents as EmojiEventsIcon,
-} from '@mui/icons-material';
 import {
 	Container,
 	Box,
@@ -43,6 +29,9 @@ import { usePlatform } from '@/platform';
 import { getCurrentStreak } from '@/daily/daily-streaks';
 import SoundSpeedDial from '@/components/sound-speed-dial';
 import FullscreenFab from '@/components/fullscreen-fab';
+import { ButtonPromptsBar } from '@/components/button-prompts';
+import MenuButtons, { MENU_ANIM_DURATION_MS } from './menu-buttons';
+import { MenuId, subMenuOpenerIds, type MenuHandlers } from './menu-definitions';
 
 // --- Title text animation constants ---
 
@@ -90,31 +79,6 @@ const charVariants = {
 	},
 } as const;
 
-const buttonContainerVariants = {
-	hidden: {},
-	visible: {
-		transition: {
-			staggerChildren: 0.1,
-			delayChildren: 1.2,
-		},
-	},
-} as const;
-
-const buttonVariants = {
-	hidden: { opacity: 0, y: 10 },
-	visible: {
-		opacity: 1,
-		y: 0,
-		transition: { duration: 0.3, ease: 'easeOut' },
-	},
-} as const;
-
-const MAX_MENU_BUTTONS = 10;
-const MENU_ANIM_DURATION_MS = (
-	buttonContainerVariants.visible.transition.delayChildren +
-	buttonContainerVariants.visible.transition.staggerChildren * (MAX_MENU_BUTTONS - 1) +
-	buttonVariants.visible.transition.duration
-) * 1000;
 
 // --- Demo match loop constants ---
 
@@ -224,6 +188,8 @@ export default function Landing() {
 		() => !!prefersReducedMotion || splashComplete,
 	);
 	const [animKey, setAnimKey] = useState(0);
+	const [activeMenu, setActiveMenu] = useState<MenuId>(MenuId.Main);
+	const focusTargetRef = useRef<string | null>(null);
 
 	// Set focus group based on animation state and whether the tutorial prompt is open.
 	// During animation, use a non-matching group so setActiveGroupAtom clears focus
@@ -352,6 +318,16 @@ export default function Landing() {
 		window.electronAPI?.quit();
 	}, []);
 
+	const navigateTo = useCallback((menuId: MenuId) => {
+		focusTargetRef.current = null;
+		setActiveMenu(menuId);
+	}, []);
+
+	const goBack = useCallback(() => {
+		focusTargetRef.current = subMenuOpenerIds[activeMenu] ?? null;
+		setActiveMenu(MenuId.Main);
+	}, [activeMenu]);
+
 	const handlePromptSkip = useCallback(async () => {
 		setShowFirstTimePrompt(false);
 		localStorage.setItem(TutorialCompletedKey, '1');
@@ -380,14 +356,20 @@ export default function Landing() {
 			return;
 		}
 
-		if (!showFirstTimePrompt) return;
+		if (showFirstTimePrompt) {
+			if (event.action === InputAction.SELECT) {
+				handlePromptAccept();
+			}
 
-		if (event.action === InputAction.SELECT) {
-			handlePromptAccept();
+			if (event.action === InputAction.BACK) {
+				handlePromptSkip();
+			}
+
+			return;
 		}
 
-		if (event.action === InputAction.BACK) {
-			handlePromptSkip();
+		if (event.action === InputAction.BACK && activeMenu !== MenuId.Main) {
+			goBack();
 		}
 	};
 
@@ -486,149 +468,43 @@ export default function Landing() {
 		</Box>
 	);
 
+	const menuHandlers: MenuHandlers = useMemo(() => ({
+		handleContinue,
+		handleNewGame,
+		handleDaily,
+		handleMultiplayer,
+		handleLeaderboard,
+		handleStats,
+		handleAchievements,
+		handleHowToPlay,
+		handleTutorial,
+		handleAbout,
+		handleQuit,
+	}), [
+		handleContinue, handleNewGame, handleDaily, handleMultiplayer,
+		handleLeaderboard, handleStats, handleAchievements,
+		handleHowToPlay, handleTutorial, handleAbout, handleQuit,
+	]);
+
+	const menuDirection = activeMenu === MenuId.Main ? 'back' as const : 'forward' as const;
+
 	const buttonsSection = (
-		<Box
-			display="inline-block"
-			width={300}
-		>
-			<motion.div
-				key={`buttons-${animKey}`}
-				variants={buttonContainerVariants}
-				initial={menuAnimDone ? false : initialState}
-				animate={(isPlatformReady && splashComplete) ? 'visible' : initialState}
-				style={menuAnimDone ? undefined : { pointerEvents: 'none' }}
-			>
-				<Box display="flex" flexDirection="column" gap={2}>
-					<motion.div variants={buttonVariants}>
-						<FocusableButton
-							id="menu-daily"
-							group="menu"
-							order={0}
-							startIcon={<TodayIcon />}
-							onClick={handleDaily}
-							autoFocus={menuAnimDone && !savedGameTime}
-						>
-							Daily Board{dailyStreak > 0 ? ` (${dailyStreak} day streak)` : ''}
-						</FocusableButton>
-					</motion.div>
-					<motion.div variants={buttonVariants}>
-						<FocusableButton
-							id="menu-continue"
-							group="menu"
-							order={1}
-							disabled={!savedGameTime}
-							startIcon={<RotateLeftIcon/>}
-							onClick={handleContinue}
-						>
-							Continue {!!savedGameTime && <FormattedTime label=" - " value={savedGameTime} />}
-						</FocusableButton>
-					</motion.div>
-					<motion.div variants={buttonVariants}>
-						<FocusableButton
-							id="menu-new-game"
-							group="menu"
-							order={2}
-							startIcon={<PlayArrowIcon />}
-							onClick={handleNewGame}
-						>
-							New Game
-						</FocusableButton>
-					</motion.div>
-					<motion.div variants={buttonVariants}>
-						<FocusableButton
-							id="menu-multiplayer"
-							group="menu"
-							order={3}
-							startIcon={<GroupsIcon />}
-							onClick={handleMultiplayer}
-						>
-							Local Multiplayer
-						</FocusableButton>
-					</motion.div>
-					{showLeaderboard && (
-						<motion.div variants={buttonVariants}>
-							<FocusableButton
-								id="menu-leaderboard"
-								group="menu"
-								order={4}
-								startIcon={<LeaderboardIcon />}
-								onClick={handleLeaderboard}
-							>
-								Leaderboards
-							</FocusableButton>
-						</motion.div>
-					)}
-					<motion.div variants={buttonVariants}>
-						<FocusableButton
-							id="menu-stats"
-							group="menu"
-							order={showLeaderboard ? 5 : 4}
-							startIcon={<BarChartIcon />}
-							onClick={handleStats}
-						>
-							Stats
-						</FocusableButton>
-					</motion.div>
-					<motion.div variants={buttonVariants}>
-						<FocusableButton
-							id="menu-achievements"
-							group="menu"
-							order={showLeaderboard ? 6 : 5}
-							startIcon={<EmojiEventsIcon />}
-							onClick={handleAchievements}
-						>
-							Achievements
-						</FocusableButton>
-					</motion.div>
-					<motion.div variants={buttonVariants}>
-						<FocusableButton
-							id="menu-tutorial"
-							group="menu"
-							order={showLeaderboard ? 7 : 6}
-							startIcon={<SchoolIcon />}
-							onClick={handleTutorial}
-						>
-							Tutorial
-						</FocusableButton>
-					</motion.div>
-					<motion.div variants={buttonVariants}>
-						<FocusableButton
-							id="menu-how-to-play"
-							group="menu"
-							order={showLeaderboard ? 8 : 7}
-							startIcon={<QuestionMarkIcon />}
-							onClick={handleHowToPlay}
-						>
-							How to Play
-						</FocusableButton>
-					</motion.div>
-					<motion.div variants={buttonVariants}>
-						<FocusableButton
-							id="menu-about"
-							group="menu"
-							order={showLeaderboard ? 9 : 8}
-							startIcon={<InfoIcon />}
-							onClick={handleAbout}
-						>
-							About
-						</FocusableButton>
-					</motion.div>
-					{!!window.electronAPI && (
-						<motion.div variants={buttonVariants}>
-							<FocusableButton
-								id="menu-quit"
-								group="menu"
-								order={showLeaderboard ? 10 : 9}
-								startIcon={<ExitToAppIcon />}
-								onClick={handleQuit}
-							>
-								Quit to Desktop
-							</FocusableButton>
-						</motion.div>
-					)}
-				</Box>
-			</motion.div>
-		</Box>
+		<MenuButtons
+			activeMenu={activeMenu}
+			direction={menuDirection}
+			menuAnimDone={menuAnimDone}
+			splashComplete={splashComplete}
+			isPlatformReady={isPlatformReady}
+			prefersReducedMotion={prefersReducedMotion}
+			animKey={animKey}
+			savedGameTime={savedGameTime}
+			dailyStreak={dailyStreak}
+			showLeaderboard={showLeaderboard}
+			handlers={menuHandlers}
+			navigateTo={navigateTo}
+			goBack={goBack}
+			focusTarget={focusTargetRef.current}
+		/>
 	);
 
 	return (
@@ -714,6 +590,27 @@ export default function Landing() {
 				</DialogActions>
 			</Dialog>
 		</Container>
+		{!!activeController && (
+			<Box
+				sx={{
+					position: 'fixed',
+					bottom: 16,
+					left: 16,
+				}}
+			>
+				<ButtonPromptsBar
+					controllerType={activeController}
+					prompts={
+						activeMenu === MenuId.Main
+							? [{ action: InputAction.SELECT, label: 'Select' }]
+							: [
+								{ action: InputAction.SELECT, label: 'Select' },
+								{ action: InputAction.BACK, label: 'Back' },
+							]
+					}
+				/>
+			</Box>
+		)}
 		<SoundSpeedDial />
 		<FullscreenFab />
 		</motion.div>
