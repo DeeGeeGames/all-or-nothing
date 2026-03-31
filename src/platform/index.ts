@@ -8,4 +8,4 @@ export type {
 	GameCompletionData,
 	GameSaveData,
 } from './types';
-export { LeaderboardName, LeaderboardFetchType } from './types';
+export { LeaderboardName, LeaderboardFetchType, LeaderboardPeriod } from './types';

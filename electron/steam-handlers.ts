@@ -53,6 +53,36 @@ const FETCH_TYPE_MAP: Readonly<Record<string, LeaderboardDataRequest>> = {
 	'friends': LeaderboardDataRequest.Friends,
 };
 
+function getISOWeek(date: Date): { year: number; week: number } {
+	const target = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+	// Set to nearest Thursday (ISO weeks start on Monday, week 1 contains Jan 4)
+	target.setUTCDate(target.getUTCDate() + 3 - ((target.getUTCDay() + 6) % 7));
+	const jan4 = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
+	const week = 1 + Math.round(((target.getTime() - jan4.getTime()) / 86400000 - 3 + ((jan4.getUTCDay() + 6) % 7)) / 7);
+	return { year: target.getUTCFullYear(), week };
+}
+
+function getCurrentMonthSuffix(): string {
+	const now = new Date();
+	return `Monthly_${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function getCurrentWeekSuffix(): string {
+	const { year, week } = getISOWeek(new Date());
+	return `Weekly_${year}W${String(week).padStart(2, '0')}`;
+}
+
+const PERIOD_SUFFIX_RESOLVERS: Readonly<Record<string, (() => string) | null>> = {
+	'alltime': null,
+	'monthly': getCurrentMonthSuffix,
+	'weekly': getCurrentWeekSuffix,
+};
+
+function resolveBoardName(baseName: string, period: string): string {
+	const resolver = PERIOD_SUFFIX_RESOLVERS[period];
+	return resolver ? `${baseName}_${resolver()}` : baseName;
+}
+
 const STEAM_ACTION_NAMES = [
 	'select',
 	'back',
@@ -281,29 +311,33 @@ export function registerSteamHandlers(appId: number) {
 	ipcMain.handle('steam:submitScore', async (_event, data: { score: number; time: number; maxCombo: number }) => {
 		if (!steamInitialized) return false;
 		try {
-			const entries = [
+			const metrics = [
 				{ key: 'score' as const, value: data.score },
 				{ key: 'time' as const, value: data.time },
 				{ key: 'combo' as const, value: data.maxCombo },
 			];
+			const periods = Object.keys(PERIOD_SUFFIX_RESOLVERS);
 
-			const results = await Promise.all(
-				entries.map(async ({ key, value }) => {
+			const results = await Promise.allSettled(
+				metrics.flatMap(({ key, value }) => {
 					const lb = STEAM_LEADERBOARDS[key];
-					const handle = await getLeaderboardHandle(lb.name, lb.sort, lb.display);
-					if (!handle) return false;
-					const result = await steam.leaderboards.uploadScore(handle, value, LeaderboardUploadScoreMethod.KeepBest);
-					return result?.success ?? false;
+					return periods.map(async (period) => {
+						const boardName = resolveBoardName(lb.name, period);
+						const handle = await getLeaderboardHandle(boardName, lb.sort, lb.display);
+						if (!handle) return false;
+						const result = await steam.leaderboards.uploadScore(handle, value, LeaderboardUploadScoreMethod.KeepBest);
+						return result?.success ?? false;
+					});
 				})
 			);
 
-			return results.every(Boolean);
+			return results.every(r => r.status === 'fulfilled' && r.value);
 		} catch {
 			return false;
 		}
 	});
 
-	ipcMain.handle('steam:fetchLeaderboard', async (_event, options: { leaderboard: string; fetchType: string; rangeStart: number; rangeEnd: number }) => {
+	ipcMain.handle('steam:fetchLeaderboard', async (_event, options: { leaderboard: string; fetchType: string; period: string; rangeStart: number; rangeEnd: number }) => {
 		if (!steamInitialized) return [];
 		try {
 			const boardKey = options.leaderboard as keyof typeof STEAM_LEADERBOARDS;
@@ -313,7 +347,8 @@ export function registerSteamHandlers(appId: number) {
 			const dataRequest = FETCH_TYPE_MAP[options.fetchType];
 			if (dataRequest === undefined) return [];
 
-			const handle = await getLeaderboardHandle(lb.name, lb.sort, lb.display);
+			const boardName = resolveBoardName(lb.name, options.period ?? 'alltime');
+			const handle = await getLeaderboardHandle(boardName, lb.sort, lb.display);
 			if (!handle) return [];
 
 			const entries = await steam.leaderboards.downloadLeaderboardEntries(handle, dataRequest, options.rangeStart, options.rangeEnd);

@@ -21,6 +21,16 @@ export
 type LeaderboardFetchType = Enum<typeof LeaderboardFetchType>;
 
 export
+const LeaderboardPeriod = {
+	AllTime: 'alltime',
+	Monthly: 'monthly',
+	Weekly: 'weekly',
+} as const;
+
+export
+type LeaderboardPeriod = Enum<typeof LeaderboardPeriod>;
+
+export
 interface LeaderboardEntry {
 	readonly rank: number;
 	readonly playerName: string;
@@ -31,6 +41,7 @@ export
 interface LeaderboardFetchOptions {
 	readonly leaderboard: LeaderboardName;
 	readonly fetchType: LeaderboardFetchType;
+	readonly period: LeaderboardPeriod;
 	readonly rangeStart: number;
 	readonly rangeEnd: number;
 }

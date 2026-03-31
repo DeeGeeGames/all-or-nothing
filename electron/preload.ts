@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	steam: {
 		init: (): Promise<boolean> => ipcRenderer.invoke('steam:init'),
 		submitScore: (data: { score: number; time: number; maxCombo: number }): Promise<boolean> => ipcRenderer.invoke('steam:submitScore', data),
-		fetchLeaderboard: (options: { leaderboard: string; fetchType: string; rangeStart: number; rangeEnd: number }): Promise<Array<{ rank: number; playerName: string; score: number }>> => ipcRenderer.invoke('steam:fetchLeaderboard', options),
+		fetchLeaderboard: (options: { leaderboard: string; fetchType: string; period: string; rangeStart: number; rangeEnd: number }): Promise<Array<{ rank: number; playerName: string; score: number }>> => ipcRenderer.invoke('steam:fetchLeaderboard', options),
 		getPlayerName: (): Promise<string | null> => ipcRenderer.invoke('steam:getPlayerName'),
 		initInput: (): Promise<boolean> => ipcRenderer.invoke('steam:initInput'),
 		shutdownInput: (): Promise<void> => ipcRenderer.invoke('steam:shutdownInput'),
