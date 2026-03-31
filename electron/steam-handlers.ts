@@ -320,7 +320,7 @@ export function registerSteamHandlers(appId: number) {
 
 			return entries.map(entry => ({
 				rank: entry.globalRank,
-				playerName: entry.steamId,
+				playerName: steam.friends.getFriendPersonaName(entry.steamId) || entry.steamId,
 				score: entry.score,
 			}));
 		} catch {
