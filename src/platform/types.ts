@@ -5,6 +5,7 @@ const LeaderboardName = {
 	Score: 'score',
 	Time: 'time',
 	Combo: 'combo',
+	FastestMatch: 'fastestMatch',
 } as const;
 
 export
@@ -51,6 +52,7 @@ interface GameCompletionData {
 	readonly score: number;
 	readonly time: number;
 	readonly maxCombo: number;
+	readonly fastestMatch: number;
 }
 
 export

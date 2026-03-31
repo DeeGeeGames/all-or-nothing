@@ -27,6 +27,7 @@ const BASE_GENERATORS: Readonly<Record<string, (rank: number) => number>> = {
 	[LeaderboardName.Score]: (rank) => Math.round((160_000 - rank * 12_000) / 10) * 10,
 	[LeaderboardName.Time]: (rank) => 90 + rank * 45,
 	[LeaderboardName.Combo]: (rank) => Math.max(18 - rank * 2, 1),
+	[LeaderboardName.FastestMatch]: (rank) => 2 + rank * 1.5,
 };
 
 export function createMockPlatformService(): PlatformService {

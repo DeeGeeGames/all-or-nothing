@@ -583,16 +583,18 @@ function generateDeck() {
 
 export
 async function getGameCompletionData(): Promise<GameCompletionData> {
-	const [scoreData, timeData, maxComboData] = await Promise.all([
+	const [scoreData, timeData, maxComboData, fastestScoreData] = await Promise.all([
 		db.gamedata.get(DbCollectionItemNameGameDataScore),
 		db.gamedata.get(DbCollectionItemNameGameDataTime),
 		db.gamedata.get(DbCollectionItemNameGameDataMaxCombo),
+		db.gamedata.get(DbCollectionItemNameGameDataFastestScore),
 	]);
 
 	return {
 		score: scoreData?.value ?? 0,
 		time: timeData?.value ?? 0,
 		maxCombo: maxComboData?.value ?? 0,
+		fastestMatch: fastestScoreData?.value ?? 0,
 	};
 }
 

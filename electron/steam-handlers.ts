@@ -45,6 +45,7 @@ const STEAM_LEADERBOARDS = {
 	score: { name: 'Highscores', sort: LeaderboardSortMethod.Descending, display: LeaderboardDisplayType.Numeric },
 	time: { name: 'BestTimes', sort: LeaderboardSortMethod.Ascending, display: LeaderboardDisplayType.TimeMilliseconds },
 	combo: { name: 'MaxCombo', sort: LeaderboardSortMethod.Descending, display: LeaderboardDisplayType.Numeric },
+	fastestMatch: { name: 'FastestMatch', sort: LeaderboardSortMethod.Ascending, display: LeaderboardDisplayType.TimeSeconds },
 } as const;
 
 const FETCH_TYPE_MAP: Readonly<Record<string, LeaderboardDataRequest>> = {
@@ -308,13 +309,14 @@ export function registerSteamHandlers(appId: number) {
 		return ensureSteamInitialized(appId);
 	});
 
-	ipcMain.handle('steam:submitScore', async (_event, data: { score: number; time: number; maxCombo: number }) => {
+	ipcMain.handle('steam:submitScore', async (_event, data: { score: number; time: number; maxCombo: number; fastestMatch: number }) => {
 		if (!steamInitialized) return false;
 		try {
 			const metrics = [
 				{ key: 'score' as const, value: data.score },
 				{ key: 'time' as const, value: data.time },
 				{ key: 'combo' as const, value: data.maxCombo },
+				...(data.fastestMatch > 0 ? [{ key: 'fastestMatch' as const, value: data.fastestMatch }] : []),
 			];
 			const periods = Object.keys(PERIOD_SUFFIX_RESOLVERS);
 

@@ -22,6 +22,7 @@ import {
 	EmojiEvents as EmojiEventsIcon,
 	AccessTime as AccessTimeIcon,
 	Whatshot as WhatshotIcon,
+	Speed as SpeedIcon,
 } from '@mui/icons-material';
 import { useSetActiveScreen, useActiveController } from '@/atoms';
 import { Screens } from '@/types';
@@ -43,6 +44,7 @@ const metricTabs = [
 	{ label: 'Score', icon: <EmojiEventsIcon />, leaderboard: LeaderboardName.Score, valueHeader: 'Score' },
 	{ label: 'Time', icon: <AccessTimeIcon />, leaderboard: LeaderboardName.Time, valueHeader: 'Time' },
 	{ label: 'Combo', icon: <WhatshotIcon />, leaderboard: LeaderboardName.Combo, valueHeader: 'Max Combo' },
+	{ label: 'Fastest', icon: <SpeedIcon />, leaderboard: LeaderboardName.FastestMatch, valueHeader: 'Fastest Match' },
 ] as const;
 
 const periodOptions = [
@@ -67,7 +69,7 @@ const scrollMap: Partial<Record<InputAction, number>> = {
 };
 
 function formatValue(value: number, leaderboard: LeaderboardName): string {
-	if (leaderboard === LeaderboardName.Time) {
+	if (leaderboard === LeaderboardName.Time || leaderboard === LeaderboardName.FastestMatch) {
 		return formatDuration(value);
 	}
 	return value.toLocaleString();
