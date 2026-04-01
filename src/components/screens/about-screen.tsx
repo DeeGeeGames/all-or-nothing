@@ -8,19 +8,58 @@ import {
 } from '@mui/icons-material';
 import { useSetActiveScreen, useActiveController } from '@/atoms';
 import { Screens } from '@/types';
-import { useScrollable } from '@/focus/useScrollable';
 import { useBackAction } from '@/input/useBackAction';
 import { InputAction } from '@/input/input-types';
 import { ButtonPromptsBar } from '@/components/button-prompts';
-import { useRef } from 'react';
+import { useFocusable } from '@/focus/useFocusable';
+import { useActivationGuard } from '@/hooks';
+import FocusIndicator from '@/components/focus-indicator';
+import { ReactNode } from 'react';
+
+const ABOUT_GROUP = 'about-links';
+
+interface FocusableLinkButtonProps {
+	id: string;
+	order: number;
+	href: string;
+	startIcon: ReactNode;
+	children: ReactNode;
+	autoFocus?: boolean;
+}
+
+function FocusableLinkButton({ id, order, href, startIcon, children, autoFocus }: FocusableLinkButtonProps) {
+	const handleActivation = useActivationGuard(() => {
+		window.open(href, '_blank');
+	});
+
+	const { ref, isFocused } = useFocusable({
+		id,
+		group: ABOUT_GROUP,
+		order,
+		onSelect: handleActivation,
+		autoFocus,
+	});
+
+	return (
+		<Box sx={{ position: 'relative' }} ref={ref}>
+			<FocusIndicator visible={isFocused} />
+			<Button
+				fullWidth
+				startIcon={startIcon}
+				endIcon={<LaunchIcon />}
+				onClick={handleActivation}
+			>
+				{children}
+			</Button>
+		</Box>
+	);
+}
 
 export default
 function AboutScreen() {
 	const setActiveScreen = useSetActiveScreen();
 	const activeController = useActiveController();
-	const contentRef = useRef<HTMLDivElement>(null);
 
-	useScrollable({ ref: contentRef });
 	useBackAction(() => setActiveScreen(Screens.Title));
 
 	return (
@@ -46,22 +85,21 @@ function AboutScreen() {
 				By David Granado
 			</Typography>
 			<Box
-				ref={contentRef}
 				flex={1}
 				overflow="auto"
 				paddingBottom={2}
 			>
 				<Box maxWidth={400} margin="0 auto" textAlign="center">
 					<Box paddingTop={5}>
-						<Button
-							fullWidth
-							startIcon={<GitHubIcon/>}
-							endIcon={<LaunchIcon />}
-							target="_blank"
+						<FocusableLinkButton
+							id="about-github"
+							order={0}
 							href="https://github.com/david0178418/all-or-nothing"
+							startIcon={<GitHubIcon/>}
+							autoFocus
 						>
 							Github Repo
-						</Button>
+						</FocusableLinkButton>
 					</Box>
 					<Box paddingTop={3}>
 						<Typography component="em">
@@ -70,79 +108,73 @@ function AboutScreen() {
 						<Typography component="em">
 							Little Prelude and Fugue
 						</Typography>
-						<Button
-							fullWidth
-							startIcon={<MusicNoteIcon/>}
-							endIcon={<LaunchIcon />}
-							target="_blank"
+						<FocusableLinkButton
+							id="about-cubworth"
+							order={1}
 							href="https://www.youtube.com/channel/UC3edSSIDJPTZmBM-m9_G3Nw"
+							startIcon={<MusicNoteIcon/>}
 						>
 							by Sir Cubworth
-						</Button>
+						</FocusableLinkButton>
 					</Box>
 					<Box paddingTop={3}>
 						<Typography component="em">
 							No.9_Esther's Waltz
 						</Typography>
-						<Button
-							fullWidth
-							startIcon={<MusicNoteIcon/>}
-							endIcon={<LaunchIcon />}
-							target="_blank"
+						<FocusableLinkButton
+							id="about-abrami"
+							order={2}
 							href="https://www.youtube.com/channel/UCOFrldzxeKGG8fTpN5_d75Q"
+							startIcon={<MusicNoteIcon/>}
 						>
 							By Esther Abrami
-						</Button>
+						</FocusableLinkButton>
 					</Box>
 					<Box paddingTop={3}>
 						<Typography component="em">
 							Baroque Coffee House
 						</Typography>
-						<Button
-							fullWidth
-							startIcon={<MusicNoteIcon/>}
-							endIcon={<LaunchIcon />}
-							target="_blank"
+						<FocusableLinkButton
+							id="about-maxwell"
+							order={3}
 							href="https://www.youtube.com/watch?v=Spo9h2opVAs&list=RDSpo9h2opVAs"
+							startIcon={<MusicNoteIcon/>}
 						>
 							By Doug Maxwell/Media Right Productions
-						</Button>
+						</FocusableLinkButton>
 					</Box>
 					<Box paddingTop={3}>
 						<Typography component="em">
 							Sonatina No 2 in F Major Allegro
 						</Typography>
-						<Button
-							fullWidth
-							startIcon={<MusicNoteIcon/>}
-							endIcon={<LaunchIcon />}
-							target="_blank"
+						<FocusableLinkButton
+							id="about-cummins"
+							order={4}
 							href="https://www.youtube.com/channel/UCKgGBUFCIZjmC-Lqy8kmJ5w"
+							startIcon={<MusicNoteIcon/>}
 						>
 							By Joel Cummins
-						</Button>
+						</FocusableLinkButton>
 					</Box>
 					<Box paddingTop={3}>
-						<Button
-							fullWidth
-							startIcon={<GraphicEqIcon/>}
-							endIcon={<LaunchIcon />}
-							target="_blank"
+						<FocusableLinkButton
+							id="about-floraphonic"
+							order={5}
 							href="https://pixabay.com/sound-effects/book-foley-turn-pages-7-189812/"
+							startIcon={<GraphicEqIcon/>}
 						>
 							Sounds by floraphonic
-						</Button>
+						</FocusableLinkButton>
 					</Box>
 					<Box paddingTop={3}>
-						<Button
-							fullWidth
-							startIcon={<GraphicEqIcon/>}
-							endIcon={<LaunchIcon />}
-							target="_blank"
+						<FocusableLinkButton
+							id="about-updatepelgo"
+							order={6}
 							href="https://pixabay.com/sound-effects/success-221935/"
+							startIcon={<GraphicEqIcon/>}
 						>
 							Also by updatepelgo
-						</Button>
+						</FocusableLinkButton>
 					</Box>
 				</Box>
 			</Box>
@@ -157,6 +189,7 @@ function AboutScreen() {
 					<ButtonPromptsBar
 						controllerType={activeController}
 						prompts={[
+							{ action: InputAction.SELECT, label: 'Open' },
 							{ action: InputAction.BACK, label: 'Back' },
 						]}
 					/>
