@@ -32,7 +32,8 @@ function isCloudAvailable(): boolean {
 
 function logCloudDiagnostics(label: string): void {
 	const quota = steam.cloud.getQuota();
-	debugLog(`${label}: quota used=${quota.usedBytes}/${quota.totalBytes}, fileExists=${steam.cloud.fileExists(CLOUD_SAVE_FILE)}`);
+	const fileInfo = steam.cloud.getAllFiles().find(f => f.name === CLOUD_SAVE_FILE);
+	debugLog(`${label}: quota used=${quota.usedBytes}/${quota.totalBytes}, file=${fileInfo ? `${fileInfo.size}b persisted=${fileInfo.persisted}` : 'absent'}`);
 }
 
 const leaderboardHandles: Map<string, bigint> = new Map();
@@ -447,7 +448,8 @@ export function registerSteamHandlers(appId: number) {
 
 		if (result) {
 			const verify = steam.cloud.fileRead(CLOUD_SAVE_FILE);
-			debugLog(`cloudSave: verify-read success=${verify.success}, bytesRead=${verify.bytesRead}, matchesInput=${verify.bytesRead === buf.length}`);
+			const fileInfo = steam.cloud.getAllFiles().find(f => f.name === CLOUD_SAVE_FILE);
+			debugLog(`cloudSave: verify-read success=${verify.success}, bytesRead=${verify.bytesRead}, matchesInput=${verify.bytesRead === buf.length}, persisted=${fileInfo?.persisted ?? 'unknown'}`);
 		}
 
 		return result;
