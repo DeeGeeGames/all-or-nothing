@@ -170,13 +170,15 @@ function GamePlayArea() {
 		};
 
 		gamepadManager.addListener(handleGameInput);
+		gamepadManager.setOnControllerDisconnected(() => setIsPaused(true));
 		keyboardManager.addListener(handleGameInput);
 
 		return () => {
 			gamepadManager.removeListener(handleGameInput);
+			gamepadManager.setOnControllerDisconnected(null);
 			keyboardManager.removeListener(handleGameInput);
 		};
-	}, []);
+	}, [setIsPaused]);
 
 	return (
 		<>

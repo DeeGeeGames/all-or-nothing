@@ -251,10 +251,12 @@ export default function MultiplayerPlayArea({ players, onQuit }: MultiplayerPlay
 		}
 
 		gamepadManager.addListener(handleInput);
+		gamepadManager.setOnControllerDisconnected(() => setPaused(true));
 		keyboardManager.addListener(handleInput);
 
 		return () => {
 			gamepadManager.removeListener(handleInput);
+			gamepadManager.setOnControllerDisconnected(null);
 			keyboardManager.removeListener(handleInput);
 		};
 	}, [sourceToPlayer, navigatePlayer, selectPlayerCurrent, setPaused]);

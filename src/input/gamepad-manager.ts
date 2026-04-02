@@ -92,7 +92,7 @@ export class GamepadManager {
 	/**
 	 * Set callback for controller disconnection
 	 */
-	public setOnControllerDisconnected(callback: (index: number) => void) {
+	public setOnControllerDisconnected(callback: ((index: number) => void) | null) {
 		this.onControllerDisconnected = callback;
 
 		return this;
