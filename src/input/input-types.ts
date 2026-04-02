@@ -104,6 +104,7 @@ export const GamepadButton = {
 	D_DOWN: 13, // D-pad down
 	D_LEFT: 14, // D-pad left
 	D_RIGHT: 15, // D-pad right
+	HOME: 16,
 } as const;
 export type GamepadButton = Enum<typeof GamepadButton>;
 

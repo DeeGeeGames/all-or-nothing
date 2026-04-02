@@ -382,6 +382,13 @@ export function registerSteamHandlers(appId: number) {
 		}
 	});
 
+	ipcMain.on('steam:activateOverlay', () => {
+		if (!steamInitialized) return;
+		try {
+			steam.overlay.activateGameOverlay('');
+		} catch { /* overlay may be disabled */ }
+	});
+
 	ipcMain.handle('steam:initInput', () => {
 		if (!ensureSteamInitialized(appId)) return false;
 		try {

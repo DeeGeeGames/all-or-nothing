@@ -44,6 +44,7 @@ interface ElectronSteamAPI {
 	offInputEvent(): void;
 	onGlyphMap(callback: (data: { glyphs: Record<string, string> | null }) => void): void;
 	offGlyphMap(): void;
+	activateOverlay(): void;
 	activateAchievement(achievementId: string): Promise<boolean>;
 	cloudSave(data: string): Promise<boolean>;
 	cloudLoad(): Promise<string | null>;

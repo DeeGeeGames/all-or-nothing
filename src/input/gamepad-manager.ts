@@ -221,6 +221,11 @@ export class GamepadManager {
 
 			// Button just pressed (rising edge)
 			if (isPressed && !wasPressed) {
+				if (index === GamepadButton.HOME) {
+					window.electronAPI?.steam.activateOverlay();
+					return;
+				}
+
 				const action = mapping[index as GamepadButton];
 				if (action) {
 					this.emitInputEvent(action, gamepad.index);

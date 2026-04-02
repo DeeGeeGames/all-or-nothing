@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 		offGlyphMap: (): void => {
 			ipcRenderer.removeAllListeners('steam:glyphMap');
 		},
+		activateOverlay: (): void => { ipcRenderer.send('steam:activateOverlay'); },
 		activateAchievement: (achievementId: string): Promise<boolean> => ipcRenderer.invoke('steam:activateAchievement', achievementId),
 		cloudSave: (data: string): Promise<boolean> => ipcRenderer.invoke('steam:cloudSave', data),
 		cloudLoad: (): Promise<string | null> => ipcRenderer.invoke('steam:cloudLoad'),
