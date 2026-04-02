@@ -12,9 +12,10 @@ import { useBackAction } from '@/input/useBackAction';
 import { InputAction } from '@/input/input-types';
 import { ButtonPromptsBar } from '@/components/button-prompts';
 import { useFocusable } from '@/focus/useFocusable';
+import { useSetActiveGroup } from '@/focus/focus-atoms';
 import { useActivationGuard } from '@/hooks';
 import FocusIndicator from '@/components/focus-indicator';
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 
 const ABOUT_GROUP = 'about-links';
 
@@ -59,6 +60,11 @@ export default
 function AboutScreen() {
 	const setActiveScreen = useSetActiveScreen();
 	const activeController = useActiveController();
+	const setActiveGroup = useSetActiveGroup();
+
+	useEffect(() => {
+		setActiveGroup(ABOUT_GROUP);
+	}, [setActiveGroup]);
 
 	useBackAction(() => setActiveScreen(Screens.Title));
 
