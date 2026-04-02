@@ -168,7 +168,7 @@ function measureConvergenceOffsets(container: HTMLElement | null): readonly [num
 export default function Landing() {
 	const splashComplete = useSplashComplete();
 	const setSplashComplete = useSetSplashComplete();
-	const [savedGameTime] = useState(getSavedGameTime);
+	const [savedGameTime, setSavedGameTime] = useState(getSavedGameTime);
 	const [demoCards, setDemoCards] = useState(generateValidSet);
 	const [phase, setPhase] = useState<DemoPhase>(splashComplete ? 'dealing' : 'waiting');
 	const [selectedCount, setSelectedCount] = useState(0);
@@ -179,6 +179,13 @@ export default function Landing() {
 	const gameTheme = useGameTheme();
 	const activeController = useActiveController();
 	const { isAvailable: showLeaderboard, isReady: isPlatformReady } = usePlatform();
+
+	useEffect(() => {
+		if (isPlatformReady) setSavedGameTime(prev => {
+			const current = getSavedGameTime();
+			return current !== prev ? current : prev;
+		});
+	}, [isPlatformReady]);
 	const [showFirstTimePrompt, setShowFirstTimePrompt] = useState(false);
 	const [dailyStreak] = useState(getCurrentStreak);
 	const containerRef = useRef<HTMLDivElement>(null);

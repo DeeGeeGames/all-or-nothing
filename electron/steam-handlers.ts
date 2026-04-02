@@ -24,8 +24,15 @@ function isSteamEnvironment(): boolean {
 	return existsSync(join(exeDir, 'steam_appid.txt'));
 }
 
+const CLOUD_SAVE_FILE = 'savegame.json';
+
 function isCloudAvailable(): boolean {
 	return steam.cloud.isCloudEnabledForAccount() && steam.cloud.isCloudEnabledForApp();
+}
+
+function logCloudDiagnostics(label: string): void {
+	const quota = steam.cloud.getQuota();
+	debugLog(`${label}: quota used=${quota.usedBytes}/${quota.totalBytes}, fileExists=${steam.cloud.fileExists(CLOUD_SAVE_FILE)}`);
 }
 
 const leaderboardHandles: Map<string, bigint> = new Map();
@@ -431,15 +438,28 @@ export function registerSteamHandlers(appId: number) {
 	ipcMain.handle('steam:cloudSave', (_event, json: string) => {
 		debugLog(`cloudSave: initialized=${steamInitialized}, accountCloud=${steamInitialized && steam.cloud.isCloudEnabledForAccount()}, appCloud=${steamInitialized && steam.cloud.isCloudEnabledForApp()}, bytes=${json.length}`);
 		if (!steamInitialized || !isCloudAvailable()) return false;
-		const result = steam.cloud.fileWrite('savegame.json', Buffer.from(json, 'utf8'));
+
+		logCloudDiagnostics('cloudSave');
+
+		const buf = Buffer.from(json, 'utf8');
+		const result = steam.cloud.fileWrite(CLOUD_SAVE_FILE, buf);
 		debugLog(`cloudSave: fileWrite result=${result}`);
+
+		if (result) {
+			const verify = steam.cloud.fileRead(CLOUD_SAVE_FILE);
+			debugLog(`cloudSave: verify-read success=${verify.success}, bytesRead=${verify.bytesRead}, matchesInput=${verify.bytesRead === buf.length}`);
+		}
+
 		return result;
 	});
 
 	ipcMain.handle('steam:cloudLoad', () => {
 		debugLog(`cloudLoad: initialized=${steamInitialized}, accountCloud=${steamInitialized && steam.cloud.isCloudEnabledForAccount()}, appCloud=${steamInitialized && steam.cloud.isCloudEnabledForApp()}`);
 		if (!steamInitialized || !isCloudAvailable()) return null;
-		const result = steam.cloud.fileRead('savegame.json');
+
+		logCloudDiagnostics('cloudLoad');
+
+		const result = steam.cloud.fileRead(CLOUD_SAVE_FILE);
 		debugLog(`cloudLoad: success=${result.success}, bytesRead=${result.bytesRead}`);
 		if (!result.success || !result.data) return null;
 		return result.data.toString('utf8');

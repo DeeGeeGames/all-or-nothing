@@ -329,16 +329,16 @@ async function exportGameState(): Promise<GameSaveData> {
 export
 async function importGameState(data: GameSaveData): Promise<void> {
 	await Promise.all([
-		db.setorders.update(DbCollectionItemNameSetOrdersDeck, { order: [...data.deck] }),
-		db.setorders.update(DbCollectionItemNameSetOrdersDiscard, { order: [...data.discard] }),
-		db.gamedata.update(DbCollectionItemNameGameDataTime, { value: data.time }),
-		db.gamedata.update(DbCollectionItemNameGameDataMisses, { value: data.misses }),
-		db.gamedata.update(DbCollectionItemNameGameDataFastestScore, { value: data.fastestScore }),
-		db.gamedata.update(DbCollectionItemNameGameDataScore, { value: data.score }),
-		db.gamedata.update(DbCollectionItemNameGameDataScoreValue, { value: data.scoreValue }),
-		db.gamedata.update(DbCollectionItemNameGameDataLastMatchTime, { value: data.lastMatchTime }),
-		db.gamedata.update(DbCollectionItemNameGameDataComboCount, { value: data.comboCount }),
-		db.gamedata.update(DbCollectionItemNameGameDataMaxCombo, { value: data.maxCombo }),
+		db.setorders.put({ name: DbCollectionItemNameSetOrdersDeck, order: [...data.deck] }),
+		db.setorders.put({ name: DbCollectionItemNameSetOrdersDiscard, order: [...data.discard] }),
+		db.gamedata.put({ id: DbCollectionItemNameGameDataTime, value: data.time }),
+		db.gamedata.put({ id: DbCollectionItemNameGameDataMisses, value: data.misses }),
+		db.gamedata.put({ id: DbCollectionItemNameGameDataFastestScore, value: data.fastestScore }),
+		db.gamedata.put({ id: DbCollectionItemNameGameDataScore, value: data.score }),
+		db.gamedata.put({ id: DbCollectionItemNameGameDataScoreValue, value: data.scoreValue }),
+		db.gamedata.put({ id: DbCollectionItemNameGameDataLastMatchTime, value: data.lastMatchTime }),
+		db.gamedata.put({ id: DbCollectionItemNameGameDataComboCount, value: data.comboCount }),
+		db.gamedata.put({ id: DbCollectionItemNameGameDataMaxCombo, value: data.maxCombo }),
 	]);
 	localStorage.setItem(SavedGameKey, String(data.time));
 
