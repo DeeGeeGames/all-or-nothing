@@ -45,7 +45,7 @@ const {
 
 export default
 function GamePlayArea() {
-	const { service } = usePlatform();
+	const { service, isReady: isPlatformReady } = usePlatform();
 	const deck = useDeck();
 	const time = useTime();
 	const score = useScore();
@@ -82,10 +82,12 @@ function GamePlayArea() {
 		}
 	}
 
-	// Save to cloud on mount (covers new game from title screen)
+	// Must wait for isReady to avoid overwriting cloud data with a freshly-seeded empty game
 	useEffect(() => {
-		triggerCloudSave();
-	}, []);
+		if (isPlatformReady) {
+			triggerCloudSave();
+		}
+	}, [isPlatformReady]);
 
 	// Save to cloud when a new game is started mid-session (pause menu reset)
 	const isFirstGameGeneration = useRef(true);
