@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain, Menu } from 'electron';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { registerSteamHandlers, setSteamInputWindow, shutdownSteamInput } from './steam-handlers';
@@ -31,6 +31,7 @@ function createWindow() {
 	setSteamInputWindow(win);
 	win.setAspectRatio(16 / 10);
 	win.once('ready-to-show', () => win?.show());
+	globalShortcut.register('F12', () => win?.webContents.toggleDevTools());
 
 	if (process.env['VITE_DEV_SERVER_URL']) {
 		win.loadURL(process.env['VITE_DEV_SERVER_URL']);

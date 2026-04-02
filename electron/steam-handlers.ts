@@ -42,10 +42,10 @@ async function getLeaderboardHandle(name: string, sortMethod: LeaderboardSortMet
 }
 
 const STEAM_LEADERBOARDS = {
-	score: { name: 'Highscores', sort: LeaderboardSortMethod.Descending, display: LeaderboardDisplayType.Numeric },
-	time: { name: 'BestTimes', sort: LeaderboardSortMethod.Ascending, display: LeaderboardDisplayType.TimeMilliseconds },
-	combo: { name: 'MaxCombo', sort: LeaderboardSortMethod.Descending, display: LeaderboardDisplayType.Numeric },
-	fastestMatch: { name: 'FastestMatch', sort: LeaderboardSortMethod.Ascending, display: LeaderboardDisplayType.TimeSeconds },
+	score: { name: 'Highscores_v3', sort: LeaderboardSortMethod.Descending, display: LeaderboardDisplayType.Numeric },
+	time: { name: 'BestTimes_v3', sort: LeaderboardSortMethod.Ascending, display: LeaderboardDisplayType.TimeMilliseconds },
+	combo: { name: 'MaxCombo_v3', sort: LeaderboardSortMethod.Descending, display: LeaderboardDisplayType.Numeric },
+	fastestMatch: { name: 'FastestMatch_v3', sort: LeaderboardSortMethod.Ascending, display: LeaderboardDisplayType.TimeSeconds },
 } as const;
 
 const FETCH_TYPE_MAP: Readonly<Record<string, LeaderboardDataRequest>> = {
