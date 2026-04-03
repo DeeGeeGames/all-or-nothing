@@ -31,7 +31,7 @@ import {
 	Container,
 	Typography,
 } from '@mui/material';
-import { useSoundEffects } from '@/hooks';
+import { useSoundEffects, useInterval } from '@/hooks';
 import { getGamepadManager } from '@/input/gamepad-manager';
 import { getKeyboardManager } from '@/input/keyboard-manager';
 import { InputAction, InputEvent } from '@/input/input-types';
@@ -98,6 +98,12 @@ function GamePlayArea() {
 		}
 		triggerCloudSave();
 	}, [gameGeneration]);
+
+	// Periodically save to cloud so the timer stays in sync
+	const runPeriodicSave = isPlatformReady && !gameComplete && !paused;
+	useInterval(() => {
+		triggerCloudSave();
+	}, runPeriodicSave ? 5000 : null);
 
 	// Reset combo state when the game screen mounts (continuing a game should not preserve combo)
 	useEffect(() => {
