@@ -30,6 +30,29 @@ function isCloudAvailable(): boolean {
 	return steam.cloud.isCloudEnabledForAccount() && steam.cloud.isCloudEnabledForApp();
 }
 
+// Cloud subsystem may need multiple callback cycles after init to populate.
+// Poll with callback flushes until available or timeout.
+function waitForCloud(maxAttempts = 10, intervalMs = 50): Promise<boolean> {
+	if (isCloudAvailable()) return Promise.resolve(true);
+
+	return new Promise(resolve => {
+		let attempts = 0;
+		const poll = setInterval(() => {
+			steam.runCallbacks();
+			attempts++;
+			if (isCloudAvailable()) {
+				clearInterval(poll);
+				debugLog(`waitForCloud: available after ${attempts} attempts`);
+				resolve(true);
+			} else if (attempts >= maxAttempts) {
+				clearInterval(poll);
+				debugLog(`waitForCloud: unavailable after ${attempts} attempts`);
+				resolve(false);
+			}
+		}, intervalMs);
+	});
+}
+
 function logCloudDiagnostics(label: string): void {
 	const quota = steam.cloud.getQuota();
 	const allFiles = steam.cloud.getAllFiles();
@@ -449,13 +472,13 @@ export function registerSteamHandlers(appId: number) {
 		}
 	});
 
-	ipcMain.handle('steam:cloudSave', (_event, json: string) => {
-		const cloudAvailable = steamInitialized && isCloudAvailable();
-		debugLog(`cloudSave: initialized=${steamInitialized}, accountCloud=${steamInitialized && steam.cloud.isCloudEnabledForAccount()}, appCloud=${steamInitialized && steam.cloud.isCloudEnabledForApp()}, bytes=${json.length}`);
+	ipcMain.handle('steam:cloudSave', async (_event, json: string) => {
+		debugLog(`cloudSave: initialized=${steamInitialized}, bytes=${json.length}`);
 		if (!steamInitialized) return false;
-		if (!cloudAvailable) {
-			debugLog('cloudSave: cloud reported unavailable, attempting operation anyway');
-		}
+
+		const cloudAvailable = await waitForCloud();
+		debugLog(`cloudSave: cloudAvailable=${cloudAvailable}`);
+		if (!cloudAvailable) return false;
 
 		logCloudDiagnostics('cloudSave');
 
@@ -472,13 +495,12 @@ export function registerSteamHandlers(appId: number) {
 		return result;
 	});
 
-	ipcMain.handle('steam:cloudLoad', () => {
-		const cloudAvailable = steamInitialized && isCloudAvailable();
-		debugLog(`cloudLoad: initialized=${steamInitialized}, accountCloud=${steamInitialized && steam.cloud.isCloudEnabledForAccount()}, appCloud=${steamInitialized && steam.cloud.isCloudEnabledForApp()}`);
+	ipcMain.handle('steam:cloudLoad', async () => {
+		debugLog(`cloudLoad: initialized=${steamInitialized}`);
 		if (!steamInitialized) return null;
-		if (!cloudAvailable) {
-			debugLog('cloudLoad: cloud reported unavailable, attempting operation anyway');
-		}
+
+		const cloudAvailable = await waitForCloud();
+		debugLog(`cloudLoad: cloudAvailable=${cloudAvailable}`);
 
 		logCloudDiagnostics('cloudLoad');
 
