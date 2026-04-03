@@ -305,6 +305,8 @@ function ensureSteamInitialized(appId: number): boolean {
 	try {
 		steam.init({ appId });
 		steamInitialized = true;
+		// Flush initial state so cloud/friends/etc. are populated before any IPC calls arrive
+		steam.runCallbacks();
 		debugLog('steam.init succeeded');
 		if (callbackInterval) clearInterval(callbackInterval);
 		// Required for async operations (leaderboards) to resolve
@@ -448,8 +450,12 @@ export function registerSteamHandlers(appId: number) {
 	});
 
 	ipcMain.handle('steam:cloudSave', (_event, json: string) => {
+		const cloudAvailable = steamInitialized && isCloudAvailable();
 		debugLog(`cloudSave: initialized=${steamInitialized}, accountCloud=${steamInitialized && steam.cloud.isCloudEnabledForAccount()}, appCloud=${steamInitialized && steam.cloud.isCloudEnabledForApp()}, bytes=${json.length}`);
-		if (!steamInitialized || !isCloudAvailable()) return false;
+		if (!steamInitialized) return false;
+		if (!cloudAvailable) {
+			debugLog('cloudSave: cloud reported unavailable, attempting operation anyway');
+		}
 
 		logCloudDiagnostics('cloudSave');
 
@@ -467,8 +473,12 @@ export function registerSteamHandlers(appId: number) {
 	});
 
 	ipcMain.handle('steam:cloudLoad', () => {
+		const cloudAvailable = steamInitialized && isCloudAvailable();
 		debugLog(`cloudLoad: initialized=${steamInitialized}, accountCloud=${steamInitialized && steam.cloud.isCloudEnabledForAccount()}, appCloud=${steamInitialized && steam.cloud.isCloudEnabledForApp()}`);
-		if (!steamInitialized || !isCloudAvailable()) return null;
+		if (!steamInitialized) return null;
+		if (!cloudAvailable) {
+			debugLog('cloudLoad: cloud reported unavailable, attempting operation anyway');
+		}
 
 		logCloudDiagnostics('cloudLoad');
 
