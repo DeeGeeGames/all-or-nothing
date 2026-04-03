@@ -32,8 +32,12 @@ function isCloudAvailable(): boolean {
 
 function logCloudDiagnostics(label: string): void {
 	const quota = steam.cloud.getQuota();
-	const fileInfo = steam.cloud.getAllFiles().find(f => f.name === CLOUD_SAVE_FILE);
-	debugLog(`${label}: quota used=${quota.usedBytes}/${quota.totalBytes}, file=${fileInfo ? `${fileInfo.size}b persisted=${fileInfo.persisted}` : 'absent'}`);
+	const allFiles = steam.cloud.getAllFiles();
+	const fileInfo = allFiles.find(f => f.name === CLOUD_SAVE_FILE);
+	debugLog(`${label}: quota used=${quota.usedBytes}/${quota.totalBytes}, file=${fileInfo ? `${fileInfo.size}b persisted=${fileInfo.persisted}` : 'absent'}, totalFiles=${allFiles.length}`);
+	allFiles.forEach(f => {
+		debugLog(`  cloud file: name="${f.name}" size=${f.size} persisted=${f.persisted}`);
+	});
 }
 
 const leaderboardHandles: Map<string, bigint> = new Map();
@@ -471,6 +475,13 @@ export function registerSteamHandlers(appId: number) {
 		const result = steam.cloud.fileRead(CLOUD_SAVE_FILE);
 		debugLog(`cloudLoad: success=${result.success}, bytesRead=${result.bytesRead}`);
 		if (!result.success || !result.data) return null;
-		return result.data.toString('utf8');
+		const json = result.data.toString('utf8');
+		try {
+			const parsed = JSON.parse(json);
+			debugLog(`cloudLoad: version=${parsed.version}, savedAt=${parsed.savedAt} (${new Date(parsed.savedAt).toISOString()}), time=${parsed.time}, deckLength=${parsed.deck?.length}, firstCards=${JSON.stringify(parsed.deck?.slice(0, 3))}`);
+		} catch {
+			debugLog('cloudLoad: failed to parse JSON for diagnostics');
+		}
+		return json;
 	});
 }
