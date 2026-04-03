@@ -360,42 +360,18 @@ function ensureSteamInitialized(appId: number): boolean {
 	if (steamInitialized) return true;
 
 	debugLog(`ensureSteamInitialized: isSteamEnvironment: ${isSteamEnvironment()}, SteamAppId env: ${process.env['SteamAppId'] ?? 'undefined'}`);
-	debugLog(`ensureSteamInitialized: cwd=${process.cwd()}, exeDir=${exeDir}, resourcesPath=${process.resourcesPath ?? 'undefined'}`);
 	if (!isSteamEnvironment()) return false;
 
 	try {
 		const initResult = steam.init({ appId });
 		debugLog(`steam.init returned: ${initResult}`);
 		if (!initResult) {
-			debugLog('steam.init returned false — SDK library likely not found');
+			debugLog('steam.init returned false — SDK library not found or init failed');
+			return false;
 		}
 		steam.runCallbacks();
 		const cloudReady = isCloudAvailable();
 		debugLog(`steam.init cloudReady=${cloudReady}`);
-
-		// Diagnose the SDK binary loaded by the FFI library
-		const sdk = steam as unknown as Record<string, unknown>;
-		const loader = sdk['libraryLoader'] as Record<string, unknown> | null;
-		if (loader) {
-			const hasRemoteStorage = typeof loader['SteamAPI_SteamRemoteStorage_v016'] === 'function';
-			const hasInit = typeof loader['SteamAPI_Init'] === 'function';
-			const hasFileWrite = typeof loader['SteamAPI_ISteamRemoteStorage_FileWrite'] === 'function';
-			const isLoaded = typeof (loader as Record<string, unknown>)['isLoaded'] === 'function'
-				? (loader as { isLoaded: () => boolean }).isLoaded()
-				: 'unknown';
-			debugLog(`loader: isLoaded=${isLoaded}, Init=${hasInit}, RemoteStorage_v016=${hasRemoteStorage}, FileWrite=${hasFileWrite}`);
-
-			// Log which library path was loaded
-			const steamLib = loader['steamLib'] as Record<string, unknown> | null;
-			if (steamLib) {
-				debugLog(`loaded library: ${JSON.stringify(Object.keys(steamLib).slice(0, 15))}`);
-				debugLog(`loaded library filename: ${steamLib['filename'] ?? steamLib['path'] ?? steamLib['name'] ?? 'unknown'}`);
-			} else {
-				debugLog('loader.steamLib is null — library was not loaded');
-			}
-		} else {
-			debugLog('libraryLoader is null/undefined on SDK instance');
-		}
 
 		if (!cloudReady) {
 			debugLog('cloud not available after init, retrying interface acquisition');
