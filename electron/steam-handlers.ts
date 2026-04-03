@@ -319,6 +319,11 @@ export function shutdownSteamInput(): void {
 	}
 }
 
+function initSteamOnce(appId: number): void {
+	steam.init({ appId });
+	steam.runCallbacks();
+}
+
 function ensureSteamInitialized(appId: number): boolean {
 	if (steamInitialized) return true;
 
@@ -326,11 +331,21 @@ function ensureSteamInitialized(appId: number): boolean {
 	if (!isSteamEnvironment()) return false;
 
 	try {
-		steam.init({ appId });
+		initSteamOnce(appId);
+		const cloudReady = isCloudAvailable();
+		debugLog(`steam.init succeeded, cloudReady=${cloudReady}`);
+
+		// The steamworks-ffi-node library caches the ISteamRemoteStorage interface
+		// pointer during init(). On some machines the RemoteStorage subsystem isn't
+		// ready yet, leaving a null pointer cached forever. Retry init to re-acquire.
+		if (!cloudReady) {
+			debugLog('cloud not available after first init, retrying with shutdown+reinit');
+			steam.shutdown();
+			initSteamOnce(appId);
+			debugLog(`reinit cloudReady=${isCloudAvailable()}`);
+		}
+
 		steamInitialized = true;
-		// Flush initial state so cloud/friends/etc. are populated before any IPC calls arrive
-		steam.runCallbacks();
-		debugLog('steam.init succeeded');
 		if (callbackInterval) clearInterval(callbackInterval);
 		// Required for async operations (leaderboards) to resolve
 		callbackInterval = setInterval(() => steam.runCallbacks(), 100);
