@@ -319,9 +319,41 @@ export function shutdownSteamInput(): void {
 	}
 }
 
-function initSteamOnce(appId: number): void {
-	steam.init({ appId });
-	steam.runCallbacks();
+// steamworks-ffi-node caches the ISteamRemoteStorage interface pointer during
+// init(). On some machines the subsystem isn't ready yet, leaving a null pointer
+// cached forever. This function reaches into the library internals to re-acquire
+// the pointer after additional callback cycles.
+function retryRemoteStorageInterface(): boolean {
+	const sdk = steam as unknown as Record<string, unknown>;
+	const apiCore = sdk['apiCore'];
+	const loader = sdk['libraryLoader'];
+
+	if (
+		typeof apiCore !== 'object' || apiCore === null ||
+		typeof loader !== 'object' || loader === null
+	) {
+		debugLog('retryRemoteStorageInterface: cannot access library internals');
+		return false;
+	}
+
+	const core = apiCore as Record<string, unknown>;
+	const lib = loader as Record<string, unknown>;
+	const acquireFn = lib['SteamAPI_SteamRemoteStorage_v016'];
+
+	if (typeof acquireFn !== 'function') {
+		debugLog('retryRemoteStorageInterface: SteamAPI_SteamRemoteStorage_v016 not available');
+		return false;
+	}
+
+	const iface: unknown = acquireFn();
+	debugLog(`retryRemoteStorageInterface: acquired interface=${iface !== null && iface !== undefined}`);
+
+	if (iface !== null && iface !== undefined) {
+		core['remoteStorageInterface'] = iface;
+		return isCloudAvailable();
+	}
+
+	return false;
 }
 
 function ensureSteamInitialized(appId: number): boolean {
@@ -331,18 +363,20 @@ function ensureSteamInitialized(appId: number): boolean {
 	if (!isSteamEnvironment()) return false;
 
 	try {
-		initSteamOnce(appId);
+		steam.init({ appId });
+		steam.runCallbacks();
 		const cloudReady = isCloudAvailable();
 		debugLog(`steam.init succeeded, cloudReady=${cloudReady}`);
 
-		// The steamworks-ffi-node library caches the ISteamRemoteStorage interface
-		// pointer during init(). On some machines the RemoteStorage subsystem isn't
-		// ready yet, leaving a null pointer cached forever. Retry init to re-acquire.
 		if (!cloudReady) {
-			debugLog('cloud not available after first init, retrying with shutdown+reinit');
-			steam.shutdown();
-			initSteamOnce(appId);
-			debugLog(`reinit cloudReady=${isCloudAvailable()}`);
+			debugLog('cloud not available after init, retrying interface acquisition');
+			for (let attempt = 1; attempt <= 5; attempt++) {
+				steam.runCallbacks();
+				if (retryRemoteStorageInterface()) {
+					debugLog(`cloud available after ${attempt} retry(s)`);
+					break;
+				}
+			}
 		}
 
 		steamInitialized = true;
