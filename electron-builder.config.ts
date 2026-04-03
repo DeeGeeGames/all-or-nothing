@@ -20,11 +20,7 @@ const config: Configuration = {
 	files: [
 		'dist/web/**/*',
 		'dist-electron/**/*',
-		'steamworks_sdk/**/*',
 		'!steam_appid.txt',
-	],
-	asarUnpack: [
-		'steamworks_sdk/**/*',
 	],
 	extraFiles: [
 		{

@@ -42,24 +42,12 @@ function waitForCloud(maxAttempts = 10, intervalMs = 50): Promise<boolean> {
 			attempts++;
 			if (isCloudAvailable()) {
 				clearInterval(poll);
-				debugLog(`waitForCloud: available after ${attempts} attempts`);
 				resolve(true);
 			} else if (attempts >= maxAttempts) {
 				clearInterval(poll);
-				debugLog(`waitForCloud: unavailable after ${attempts} attempts`);
 				resolve(false);
 			}
 		}, intervalMs);
-	});
-}
-
-function logCloudDiagnostics(label: string): void {
-	const quota = steam.cloud.getQuota();
-	const allFiles = steam.cloud.getAllFiles();
-	const fileInfo = allFiles.find(f => f.name === CLOUD_SAVE_FILE);
-	debugLog(`${label}: quota used=${quota.usedBytes}/${quota.totalBytes}, file=${fileInfo ? `${fileInfo.size}b persisted=${fileInfo.persisted}` : 'absent'}, totalFiles=${allFiles.length}`);
-	allFiles.forEach(f => {
-		debugLog(`  cloud file: name="${f.name}" size=${f.size} persisted=${f.persisted}`);
 	});
 }
 
@@ -204,8 +192,6 @@ export function setSteamInputWindow(win: BrowserWindow): void {
 	mainWindow = win;
 }
 
-let pollDebugCountdown = 0;
-
 function pollSteamInput(): void {
 	if (!steamInitialized || !actionSetHandle || !mainWindow) return;
 
@@ -219,37 +205,14 @@ function pollSteamInput(): void {
 	const controllerHandles = steam.input.getConnectedControllers();
 	const currentHandles = new Set(controllerHandles);
 
-	// Log once per second for debugging
-	const shouldLog = pollDebugCountdown <= 0;
-	if (shouldLog) pollDebugCountdown = 60;
-	pollDebugCountdown--;
-
-	if (shouldLog) {
-		debugLog(`controllers: ${controllerHandles.length}, handles: [${controllerHandles.join(', ')}]`);
-	}
-
 	controllerHandles.forEach(handle => {
 		steam.input.activateActionSet(handle, setHandle);
-
-		if (shouldLog) {
-			const currentSet = steam.input.getCurrentActionSet(handle);
-			const inputType = steam.input.getInputTypeForHandle(handle);
-			const selectOrigins = digitalActionHandles[0]
-				? steam.input.getDigitalActionOrigins(handle, setHandle, digitalActionHandles[0].handle)
-				: [];
-			debugLog(`controller ${handle}: type=${inputType} (${mapSteamInputType(inputType)}), currentActionSet=${currentSet}, expectedActionSet=${setHandle}, selectOrigins=[${selectOrigins.join(', ')}]`);
-		}
 
 		const prevButtonStates = previousStates.get(handle) ?? new Map<string, boolean>();
 		const controllerType = mapSteamInputType(steam.input.getInputTypeForHandle(handle));
 
 		digitalActionHandles.forEach(({ name, handle: actionHandle }) => {
-			const actionData = steam.input.getDigitalActionData(handle, actionHandle);
-			const { state: pressed } = actionData;
-
-			if (shouldLog && name === 'select') {
-				debugLog(`"select" data: ${JSON.stringify(actionData)}`);
-			}
+			const { state: pressed } = steam.input.getDigitalActionData(handle, actionHandle);
 			const wasPressed = prevButtonStates.get(name) ?? false;
 
 			if (pressed && !wasPressed) {
@@ -331,23 +294,15 @@ function retryRemoteStorageInterface(): boolean {
 	if (
 		typeof apiCore !== 'object' || apiCore === null ||
 		typeof loader !== 'object' || loader === null
-	) {
-		debugLog('retryRemoteStorageInterface: cannot access library internals');
-		return false;
-	}
+	) return false;
 
 	const core = apiCore as Record<string, unknown>;
 	const lib = loader as Record<string, unknown>;
 	const acquireFn = lib['SteamAPI_SteamRemoteStorage_v016'];
 
-	if (typeof acquireFn !== 'function') {
-		debugLog('retryRemoteStorageInterface: SteamAPI_SteamRemoteStorage_v016 not available');
-		return false;
-	}
+	if (typeof acquireFn !== 'function') return false;
 
 	const iface: unknown = acquireFn();
-	debugLog(`retryRemoteStorageInterface: acquired interface=${iface !== null && iface !== undefined}`);
-
 	if (iface !== null && iface !== undefined) {
 		core['remoteStorageInterface'] = iface;
 		return isCloudAvailable();
@@ -359,22 +314,17 @@ function retryRemoteStorageInterface(): boolean {
 function ensureSteamInitialized(appId: number): boolean {
 	if (steamInitialized) return true;
 
-	debugLog(`ensureSteamInitialized: isSteamEnvironment: ${isSteamEnvironment()}, SteamAppId env: ${process.env['SteamAppId'] ?? 'undefined'}`);
 	if (!isSteamEnvironment()) return false;
 
 	try {
 		const initResult = steam.init({ appId });
-		debugLog(`steam.init returned: ${initResult}`);
 		if (!initResult) {
-			debugLog('steam.init returned false — SDK library not found or init failed');
+			debugLog('steam.init failed — SDK library not found or Steam not running');
 			return false;
 		}
 		steam.runCallbacks();
-		const cloudReady = isCloudAvailable();
-		debugLog(`steam.init cloudReady=${cloudReady}`);
 
-		if (!cloudReady) {
-			debugLog('cloud not available after init, retrying interface acquisition');
+		if (!isCloudAvailable()) {
 			for (let attempt = 1; attempt <= 5; attempt++) {
 				steam.runCallbacks();
 				if (retryRemoteStorageInterface()) {
@@ -501,11 +451,6 @@ export function registerSteamHandlers(appId: number) {
 				handle: steam.input.getDigitalActionHandle(name),
 			}));
 
-			debugLog(`actionSetHandle: ${actionSetHandle}`);
-			digitalActionHandles.forEach(({ name, handle }) => {
-				debugLog(`action "${name}" handle: ${handle}`);
-			});
-
 			inputPollInterval = setInterval(pollSteamInput, 16);
 			return true;
 		} catch {
@@ -527,47 +472,23 @@ export function registerSteamHandlers(appId: number) {
 	});
 
 	ipcMain.handle('steam:cloudSave', async (_event, json: string) => {
-		debugLog(`cloudSave: initialized=${steamInitialized}, bytes=${json.length}`);
 		if (!steamInitialized) return false;
 
 		const cloudAvailable = await waitForCloud();
-		debugLog(`cloudSave: cloudAvailable=${cloudAvailable}`);
 		if (!cloudAvailable) return false;
 
-		logCloudDiagnostics('cloudSave');
-
 		const buf = Buffer.from(json, 'utf8');
-		const result = steam.cloud.fileWrite(CLOUD_SAVE_FILE, buf);
-		debugLog(`cloudSave: fileWrite result=${result}`);
-
-		if (result) {
-			const verify = steam.cloud.fileRead(CLOUD_SAVE_FILE);
-			const fileInfo = steam.cloud.getAllFiles().find(f => f.name === CLOUD_SAVE_FILE);
-			debugLog(`cloudSave: verify-read success=${verify.success}, bytesRead=${verify.bytesRead}, matchesInput=${verify.bytesRead === buf.length}, persisted=${fileInfo?.persisted ?? 'unknown'}`);
-		}
-
-		return result;
+		return steam.cloud.fileWrite(CLOUD_SAVE_FILE, buf);
 	});
 
 	ipcMain.handle('steam:cloudLoad', async () => {
-		debugLog(`cloudLoad: initialized=${steamInitialized}`);
 		if (!steamInitialized) return null;
 
 		const cloudAvailable = await waitForCloud();
-		debugLog(`cloudLoad: cloudAvailable=${cloudAvailable}`);
-
-		logCloudDiagnostics('cloudLoad');
+		if (!cloudAvailable) return null;
 
 		const result = steam.cloud.fileRead(CLOUD_SAVE_FILE);
-		debugLog(`cloudLoad: success=${result.success}, bytesRead=${result.bytesRead}`);
 		if (!result.success || !result.data) return null;
-		const json = result.data.toString('utf8');
-		try {
-			const parsed = JSON.parse(json);
-			debugLog(`cloudLoad: version=${parsed.version}, savedAt=${parsed.savedAt} (${new Date(parsed.savedAt).toISOString()}), time=${parsed.time}, deckLength=${parsed.deck?.length}, firstCards=${JSON.stringify(parsed.deck?.slice(0, 3))}`);
-		} catch {
-			debugLog('cloudLoad: failed to parse JSON for diagnostics');
-		}
-		return json;
+		return result.data.toString('utf8');
 	});
 }
