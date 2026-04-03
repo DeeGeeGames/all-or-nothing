@@ -368,6 +368,22 @@ function ensureSteamInitialized(appId: number): boolean {
 		const cloudReady = isCloudAvailable();
 		debugLog(`steam.init succeeded, cloudReady=${cloudReady}`);
 
+		// Diagnose the SDK binary loaded by the FFI library
+		const sdk = steam as unknown as Record<string, unknown>;
+		const loader = sdk['libraryLoader'] as Record<string, unknown> | null;
+		if (loader) {
+			const hasRemoteStorage = typeof loader['SteamAPI_SteamRemoteStorage_v016'] === 'function';
+			const hasInit = typeof loader['SteamAPI_Init'] === 'function';
+			const hasFileWrite = typeof loader['SteamAPI_ISteamRemoteStorage_FileWrite'] === 'function';
+			debugLog(`loader bindings: Init=${hasInit}, RemoteStorage_v016=${hasRemoteStorage}, FileWrite=${hasFileWrite}`);
+
+			// Log which library path was loaded
+			const steamLib = loader['steamLib'] as Record<string, unknown> | null;
+			if (steamLib) {
+				debugLog(`loaded library: ${steamLib['filename'] ?? steamLib['path'] ?? JSON.stringify(Object.keys(steamLib).slice(0, 10))}`);
+			}
+		}
+
 		if (!cloudReady) {
 			debugLog('cloud not available after init, retrying interface acquisition');
 			for (let attempt = 1; attempt <= 5; attempt++) {
