@@ -484,8 +484,10 @@ export function registerSteamHandlers(appId: number) {
 	ipcMain.handle('steam:cloudLoad', async () => {
 		if (!steamInitialized) return null;
 
-		const cloudAvailable = await waitForCloud();
-		if (!cloudAvailable) return null;
+		// Intentionally do not bail on !cloudAvailable — fileRead may still succeed
+		// even when isCloudAvailable() reports false (e.g. when retryRemoteStorageInterface
+		// populated the interface pointer manually, or Steam serves a cached copy).
+		await waitForCloud();
 
 		const result = steam.cloud.fileRead(CLOUD_SAVE_FILE);
 		if (!result.success || !result.data) return null;
