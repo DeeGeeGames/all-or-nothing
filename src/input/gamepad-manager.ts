@@ -9,6 +9,27 @@ import {
 import { ControllerMappings, detectControllerType } from './controller-mappings';
 
 /**
+ * Steam Input on Linux can present a single physical controller as both the
+ * physical device and a virtual XInput mirror (Valve vendor 28de, product
+ * 11ff), causing every input to fire twice. Filter the virtual mirror out
+ * unconditionally — it's strictly a duplicate of a physical device that's
+ * already present.
+ *
+ * The filter is intentionally narrow: real Valve hardware (Steam Controller,
+ * Steam Deck embedded, etc.) use different product IDs (1102, 1142, 1205, …)
+ * and must remain available so a player can use them in local multiplayer.
+ */
+const STEAM_VIRTUAL_XINPUT_ID_FRAGMENT = 'vendor: 28de product: 11ff';
+
+export function getActiveGamepads(
+	gamepads: ReadonlyArray<Gamepad | null>,
+): ReadonlyArray<Gamepad> {
+	return gamepads.filter((gp): gp is Gamepad =>
+		gp !== null && !gp.id.toLowerCase().includes(STEAM_VIRTUAL_XINPUT_ID_FRAGMENT)
+	);
+}
+
+/**
  * Threshold for analog stick input to be considered a directional press
  */
 const ANALOG_THRESHOLD = 0.5;
@@ -195,8 +216,10 @@ export class GamepadManager {
 
 		// Get fresh gamepad state (must be called each frame)
 		const gamepads = navigator.getGamepads();
+		const activeIndexes = new Set(getActiveGamepads(gamepads).map(gp => gp.index));
 
 		this.connectedGamepads.forEach((_, index) => {
+			if (!activeIndexes.has(index)) return;
 			const gamepad = gamepads[index];
 			if (!gamepad) return;
 
