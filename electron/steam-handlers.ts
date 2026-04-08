@@ -163,8 +163,6 @@ let digitalActionHandles: ReadonlyArray<{ name: string; handle: bigint }> = [];
 const previousStates: Map<bigint, Map<string, boolean>> = new Map();
 const resolvedGlyphControllers: Set<bigint> = new Set();
 let mainWindow: BrowserWindow | null = null;
-const loggedControllers: Set<bigint> = new Set();
-let firstPressLogged = false;
 
 function resolveGlyphs(): Record<string, string> | null {
 	if (!actionSetHandle) return null;
@@ -222,15 +220,6 @@ function pollSteamInput(): void {
 		const prevButtonStates = previousStates.get(handle) ?? new Map<string, boolean>();
 		const controllerType = mapSteamInputType(steam.input.getInputTypeForHandle(handle));
 
-		if (!loggedControllers.has(handle)) {
-			loggedControllers.add(handle);
-			const snapshot = digitalActionHandles.map(({ name, handle: actionHandle }) => {
-				const data = steam.input.getDigitalActionData(handle, actionHandle);
-				return { name, state: data.state, active: data.active };
-			});
-			debugLog(`pollSteamInput: controller ${handle.toString()} type=${controllerType} firstSnapshot=${JSON.stringify(snapshot)}`);
-		}
-
 		digitalActionHandles.forEach(({ name, handle: actionHandle }) => {
 			const { state: pressed } = steam.input.getDigitalActionData(handle, actionHandle);
 			const wasPressed = prevButtonStates.get(name) ?? false;
@@ -238,10 +227,6 @@ function pollSteamInput(): void {
 			if (pressed && !wasPressed) {
 				const action = STEAM_ACTION_TO_INPUT_ACTION[name];
 				if (action) {
-					if (!firstPressLogged) {
-						firstPressLogged = true;
-						debugLog(`pollSteamInput: first press observed action=${action} controller=${handle.toString()}`);
-					}
 					win.webContents.send('steam:inputEvent', {
 						action,
 						controllerType,
@@ -287,8 +272,6 @@ export function shutdownSteamInput(): void {
 	}
 	previousStates.clear();
 	resolvedGlyphControllers.clear();
-	loggedControllers.clear();
-	firstPressLogged = false;
 	if (steamInitialized) {
 		try {
 			steam.input.shutdown();
@@ -449,36 +432,19 @@ export function registerSteamHandlers(appId: number) {
 	});
 
 	ipcMain.handle('steam:initInput', () => {
-		if (!ensureSteamInitialized(appId)) return false;
-		try {
-			// Re-enabled to retest Steam Input now that the Steamworks SDK is actually
-			// bundled into packaged builds (electron-builder.config.ts asarUnpack). Prior
-			// "unpublished IGA" diagnostics were collected when the SDK load path was
-			// inconsistent, so they may not have reflected the real failure mode.
-			const manifestPath = app.isPackaged
-				? join(exeDir, 'controller_config', 'game_actions.vdf')
-				: join(app.getAppPath(), 'steam', 'controller_config', 'game_actions.vdf');
-			debugLog(`initInput: manifestPath=${manifestPath} exists=${existsSync(manifestPath)}`);
-			const manifestSet = steam.input.setInputActionManifestFilePath(manifestPath);
-			debugLog(`initInput: setInputActionManifestFilePath returned ${manifestSet}`);
-
-			steam.input.init(true);
-			debugLog('initInput: steam.input.init(true) completed');
-
-			actionSetHandle = steam.input.getActionSetHandle('GameControls');
-			digitalActionHandles = STEAM_ACTION_NAMES.map(name => ({
-				name,
-				handle: steam.input.getDigitalActionHandle(name),
-			}));
-			debugLog(`initInput: actionSetHandle=${actionSetHandle}`);
-			debugLog(`initInput: digitalActionHandles=${JSON.stringify(digitalActionHandles.map(({ name, handle }) => ({ name, handle: handle.toString() })))}`);
-
-			inputPollInterval = setInterval(pollSteamInput, 16);
-			return true;
-		} catch (e) {
-			debugLog(`initInput: threw ${e}`);
-			return false;
-		}
+		// Steam Input is disabled until the IGA is published on the Steamworks partner
+		// site. Returning false here keeps the renderer on the browser Gamepad API path,
+		// which works as long as the Steam controller template is set to "Generic Gamepad"
+		// (which emits XInput events the browser picks up directly).
+		//
+		// Confirmed reproducible 2026-04-08 with the Steamworks SDK definitively bundled:
+		// setInputActionManifestFilePath returns true and the .vdf is found, but every
+		// getActionSetHandle / getDigitalActionHandle call returns 0. The action set name
+		// and button names in game_actions.vdf match the code exactly, so this is not a
+		// naming bug — Steam appears to silently refuse to resolve handles from a manifest
+		// for an unpublished title, regardless of whether the SDK is loaded correctly.
+		// Re-test after the IGA is published.
+		return false;
 	});
 
 	ipcMain.handle('steam:shutdownInput', () => {
