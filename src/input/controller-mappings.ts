@@ -42,7 +42,7 @@ export const ControllerMappings: Record<ControllerType, Partial<Record<GamepadBu
 		[GamepadButton.B]: InputAction.BACK, // Right button (B)
 		[GamepadButton.X]: InputAction.HINT, // Left button (X)
 		[GamepadButton.Y]: InputAction.SHUFFLE, // Top button (Y)
-		[GamepadButton.SELECT]: InputAction.PAUSE, // View button
+		[GamepadButton.START]: InputAction.PAUSE, // Menu button
 		[GamepadButton.D_UP]: InputAction.NAVIGATE_UP,
 		[GamepadButton.D_DOWN]: InputAction.NAVIGATE_DOWN,
 		[GamepadButton.D_LEFT]: InputAction.NAVIGATE_LEFT,
@@ -138,7 +138,7 @@ export const ControllerButtonLabels: Record<ControllerType, Record<InputAction, 
 		[InputAction.BACK]: 'B',
 		[InputAction.HINT]: 'X',
 		[InputAction.SHUFFLE]: 'Y',
-		[InputAction.PAUSE]: 'View',
+		[InputAction.PAUSE]: 'Menu',
 		[InputAction.NAVIGATE_UP]: 'D-Pad ↑',
 		[InputAction.NAVIGATE_DOWN]: 'D-Pad ↓',
 		[InputAction.NAVIGATE_LEFT]: 'D-Pad ←',
