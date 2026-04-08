@@ -103,7 +103,7 @@ function GamePlayArea() {
 	const runPeriodicSave = isPlatformReady && !gameComplete && !paused;
 	useInterval(() => {
 		triggerCloudSave();
-	}, runPeriodicSave ? 5000 : null);
+	}, runPeriodicSave ? 3000 : null);
 
 	// Reset combo state when the game screen mounts (continuing a game should not preserve combo)
 	useEffect(() => {

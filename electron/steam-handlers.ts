@@ -31,24 +31,33 @@ function isCloudAvailable(): boolean {
 }
 
 // Cloud subsystem may need multiple callback cycles after init to populate.
-// Poll with callback flushes until available or timeout.
-function waitForCloud(maxAttempts = 10, intervalMs = 50): Promise<boolean> {
-	if (isCloudAvailable()) return Promise.resolve(true);
+// Poll with callback flushes until available or timeout, then resolve regardless:
+// fileRead/fileWrite may still succeed even when isCloudAvailable() reports false
+// (e.g. when retryRemoteStorageInterface populated the interface pointer manually,
+// or Steam serves a cached copy). Returns void deliberately — callers must not bail.
+function waitForCloud(maxAttempts = 10, intervalMs = 50): Promise<void> {
+	if (isCloudAvailable()) return Promise.resolve();
 
 	return new Promise(resolve => {
 		let attempts = 0;
 		const poll = setInterval(() => {
 			steam.runCallbacks();
 			attempts++;
-			if (isCloudAvailable()) {
+			if (isCloudAvailable() || attempts >= maxAttempts) {
 				clearInterval(poll);
-				resolve(true);
-			} else if (attempts >= maxAttempts) {
-				clearInterval(poll);
-				resolve(false);
+				resolve();
 			}
 		}, intervalMs);
 	});
+}
+
+// Single chokepoint for cloud file ops: gates on steamInitialized, waits for the
+// cloud subsystem, then runs the op. Use this for any new cloud handler so the
+// "do I bail on !cloudAvailable?" question can't be answered wrong.
+async function withCloud<T>(notReady: T, op: () => T): Promise<T> {
+	if (!steamInitialized) return notReady;
+	await waitForCloud();
+	return op();
 }
 
 const leaderboardHandles: Map<string, bigint> = new Map();
@@ -471,26 +480,17 @@ export function registerSteamHandlers(appId: number) {
 		}
 	});
 
-	ipcMain.handle('steam:cloudSave', async (_event, json: string) => {
-		if (!steamInitialized) return false;
+	ipcMain.handle('steam:cloudSave', (_event, json: string) =>
+		withCloud(false, () =>
+			steam.cloud.fileWrite(CLOUD_SAVE_FILE, Buffer.from(json, 'utf8'))
+		)
+	);
 
-		const cloudAvailable = await waitForCloud();
-		if (!cloudAvailable) return false;
-
-		const buf = Buffer.from(json, 'utf8');
-		return steam.cloud.fileWrite(CLOUD_SAVE_FILE, buf);
-	});
-
-	ipcMain.handle('steam:cloudLoad', async () => {
-		if (!steamInitialized) return null;
-
-		// Intentionally do not bail on !cloudAvailable — fileRead may still succeed
-		// even when isCloudAvailable() reports false (e.g. when retryRemoteStorageInterface
-		// populated the interface pointer manually, or Steam serves a cached copy).
-		await waitForCloud();
-
-		const result = steam.cloud.fileRead(CLOUD_SAVE_FILE);
-		if (!result.success || !result.data) return null;
-		return result.data.toString('utf8');
-	});
+	ipcMain.handle('steam:cloudLoad', () =>
+		withCloud<string | null>(null, () => {
+			const result = steam.cloud.fileRead(CLOUD_SAVE_FILE);
+			if (!result.success || !result.data) return null;
+			return result.data.toString('utf8');
+		})
+	);
 }
