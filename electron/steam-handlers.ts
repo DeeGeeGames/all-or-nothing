@@ -163,6 +163,8 @@ let digitalActionHandles: ReadonlyArray<{ name: string; handle: bigint }> = [];
 const previousStates: Map<bigint, Map<string, boolean>> = new Map();
 const resolvedGlyphControllers: Set<bigint> = new Set();
 let mainWindow: BrowserWindow | null = null;
+const loggedControllers: Set<bigint> = new Set();
+let firstPressLogged = false;
 
 function resolveGlyphs(): Record<string, string> | null {
 	if (!actionSetHandle) return null;
@@ -220,6 +222,15 @@ function pollSteamInput(): void {
 		const prevButtonStates = previousStates.get(handle) ?? new Map<string, boolean>();
 		const controllerType = mapSteamInputType(steam.input.getInputTypeForHandle(handle));
 
+		if (!loggedControllers.has(handle)) {
+			loggedControllers.add(handle);
+			const snapshot = digitalActionHandles.map(({ name, handle: actionHandle }) => {
+				const data = steam.input.getDigitalActionData(handle, actionHandle);
+				return { name, state: data.state, active: data.active };
+			});
+			debugLog(`pollSteamInput: controller ${handle.toString()} type=${controllerType} firstSnapshot=${JSON.stringify(snapshot)}`);
+		}
+
 		digitalActionHandles.forEach(({ name, handle: actionHandle }) => {
 			const { state: pressed } = steam.input.getDigitalActionData(handle, actionHandle);
 			const wasPressed = prevButtonStates.get(name) ?? false;
@@ -227,6 +238,10 @@ function pollSteamInput(): void {
 			if (pressed && !wasPressed) {
 				const action = STEAM_ACTION_TO_INPUT_ACTION[name];
 				if (action) {
+					if (!firstPressLogged) {
+						firstPressLogged = true;
+						debugLog(`pollSteamInput: first press observed action=${action} controller=${handle.toString()}`);
+					}
 					win.webContents.send('steam:inputEvent', {
 						action,
 						controllerType,
@@ -272,6 +287,8 @@ export function shutdownSteamInput(): void {
 	}
 	previousStates.clear();
 	resolvedGlyphControllers.clear();
+	loggedControllers.clear();
+	firstPressLogged = false;
 	if (steamInitialized) {
 		try {
 			steam.input.shutdown();
@@ -434,35 +451,32 @@ export function registerSteamHandlers(appId: number) {
 	ipcMain.handle('steam:initInput', () => {
 		if (!ensureSteamInitialized(appId)) return false;
 		try {
-			// NOTE: setInputActionManifestFilePath was attempted here but produced 0 handles
-			// for all actions, likely because the game is unpublished. The IGA and default
-			// configurations must be published on the Steamworks partner site for Steam Input
-			// to work. If Steam Input still doesn't work after publishing, re-enable this:
-			//
-			//   const manifestPath = app.isPackaged
-			//     ? join(exeDir, 'controller_config', 'game_actions.vdf')
-			//     : join(app.getAppPath(), 'steam', 'controller_config', 'game_actions.vdf');
-			//   steam.input.setInputActionManifestFilePath(manifestPath);
-			//
-			// Diagnostics from pre-publish testing (2026-03-27):
-			// - Without manifest call: handles valid (1-9), active:true, origins bound,
-			//   but state always false — Steam partially loads draft IGA but doesn't
-			//   forward actual button data for unpublished titles.
-			// - With manifest call: set returns true, file exists, but all handles are 0.
-			// - Generic gamepad template works because it bypasses Steam Input entirely
-			//   and emits XInput events to the browser Gamepad API.
+			// Re-enabled to retest Steam Input now that the Steamworks SDK is actually
+			// bundled into packaged builds (electron-builder.config.ts asarUnpack). Prior
+			// "unpublished IGA" diagnostics were collected when the SDK load path was
+			// inconsistent, so they may not have reflected the real failure mode.
+			const manifestPath = app.isPackaged
+				? join(exeDir, 'controller_config', 'game_actions.vdf')
+				: join(app.getAppPath(), 'steam', 'controller_config', 'game_actions.vdf');
+			debugLog(`initInput: manifestPath=${manifestPath} exists=${existsSync(manifestPath)}`);
+			const manifestSet = steam.input.setInputActionManifestFilePath(manifestPath);
+			debugLog(`initInput: setInputActionManifestFilePath returned ${manifestSet}`);
 
 			steam.input.init(true);
+			debugLog('initInput: steam.input.init(true) completed');
 
 			actionSetHandle = steam.input.getActionSetHandle('GameControls');
 			digitalActionHandles = STEAM_ACTION_NAMES.map(name => ({
 				name,
 				handle: steam.input.getDigitalActionHandle(name),
 			}));
+			debugLog(`initInput: actionSetHandle=${actionSetHandle}`);
+			debugLog(`initInput: digitalActionHandles=${JSON.stringify(digitalActionHandles.map(({ name, handle }) => ({ name, handle: handle.toString() })))}`);
 
 			inputPollInterval = setInterval(pollSteamInput, 16);
 			return true;
-		} catch {
+		} catch (e) {
+			debugLog(`initInput: threw ${e}`);
 			return false;
 		}
 	});
