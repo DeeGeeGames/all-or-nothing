@@ -5,7 +5,7 @@ import { Screens } from '@/types';
 import { detectControllerType } from '@/input/controller-mappings';
 import { InputAction, ControllerType } from '@/input/input-types';
 import type { InputEvent } from '@/input/input-types';
-import { getGamepadManager, getActiveGamepads } from '@/input/gamepad-manager';
+import { getGamepadManager } from '@/input/gamepad-manager';
 import { getKeyboardManager } from '@/input/keyboard-manager';
 import { useSetPlayerRoster } from '@/multiplayer/multiplayer-atoms';
 import { Player, PLAYER_COLORS, PLAYER_IDS } from '@/multiplayer/multiplayer-types';
@@ -23,10 +23,13 @@ export default function LobbyScreen() {
 	// Track connected gamepads for UI display
 	useEffect(() => {
 		function updateGamepads() {
-			const active = getActiveGamepads(navigator.getGamepads());
-			const connected = new Map<number, ControllerType>(
-				active.map(gp => [gp.index, detectControllerType(gp.id)] as const)
-			);
+			const gamepads = navigator.getGamepads();
+			const connected = new Map<number, ControllerType>();
+			for (const gp of gamepads) {
+				if (gp) {
+					connected.set(gp.index, detectControllerType(gp.id));
+				}
+			}
 			setConnectedGamepads(connected);
 		}
 
