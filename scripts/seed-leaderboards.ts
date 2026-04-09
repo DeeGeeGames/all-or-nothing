@@ -148,12 +148,11 @@ async function findOrCreateLeaderboard(args: FindOrCreateArgs): Promise<FindOrCr
 	const board = (json as {
 		result?: { leaderboard?: { leaderBoardID?: number; leaderBoardEntries?: number } };
 	}).result?.leaderboard;
-	const id = board?.leaderBoardID;
-	if (typeof id !== 'number') {
+	if (!board || typeof board.leaderBoardID !== 'number') {
 		throw new Error(`FindOrCreateLeaderboard(${args.name}) returned unexpected shape: ${JSON.stringify(json)}`);
 	}
 	const entryCount = typeof board.leaderBoardEntries === 'number' ? board.leaderBoardEntries : 0;
-	return { id, entryCount };
+	return { id: board.leaderBoardID, entryCount };
 }
 
 interface SeedRequest {
