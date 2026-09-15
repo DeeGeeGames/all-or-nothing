@@ -1,6 +1,3 @@
-import { formatDate } from './daily-streaks';
-import { getPacificDate } from './pacific-date';
-
 const STORAGE_KEY_PREFIX = 'daily-board-state-';
 
 interface DailyBoardState {
@@ -8,49 +5,57 @@ interface DailyBoardState {
 	setsFound: number;
 }
 
-function todayKey(): string {
-	return `${STORAGE_KEY_PREFIX}${formatDate(getPacificDate())}`;
+function boardKey(date: string): string {
+	return `${STORAGE_KEY_PREFIX}${date}`;
+}
+
+function isDailyBoardState(value: unknown): value is DailyBoardState {
+	if (typeof value !== 'object' || value === null) return false;
+	if (!('flippedCardIds' in value) || !('setsFound' in value)) return false;
+	return Array.isArray(value.flippedCardIds) && typeof value.setsFound === 'number';
 }
 
 export
-function saveDailyBoardState(flippedCardIds: ReadonlySet<string>, setsFound: number): void {
+function saveDailyBoardState(
+	date: string,
+	flippedCardIds: ReadonlySet<string>,
+	setsFound: number,
+	storage: Pick<Storage, 'setItem'> = localStorage,
+): void {
 	const state: DailyBoardState = {
 		flippedCardIds: [...flippedCardIds],
 		setsFound,
 	};
-	localStorage.setItem(todayKey(), JSON.stringify(state));
+	storage.setItem(boardKey(date), JSON.stringify(state));
 }
 
 export
-function loadDailyBoardState(): { flippedCardIds: Set<string>; setsFound: number } | null {
-	const raw = localStorage.getItem(todayKey());
+function loadDailyBoardState(
+	date: string,
+	storage: Pick<Storage, 'getItem'> = localStorage,
+): { flippedCardIds: Set<string>; setsFound: number } | null {
+	const raw = storage.getItem(boardKey(date));
 	if (!raw) return null;
 
 	try {
 		const parsed: unknown = JSON.parse(raw);
-
-		if (
-			typeof parsed === 'object' &&
-			parsed !== null &&
-			'flippedCardIds' in parsed &&
-			'setsFound' in parsed &&
-			Array.isArray((parsed as DailyBoardState).flippedCardIds) &&
-			typeof (parsed as DailyBoardState).setsFound === 'number'
-		) {
-			const state = parsed as DailyBoardState;
-			return {
-				flippedCardIds: new Set(state.flippedCardIds),
-				setsFound: state.setsFound,
-			};
+		if (!isDailyBoardState(parsed)) {
+			return null;
 		}
 
-		return null;
+		return {
+			flippedCardIds: new Set(parsed.flippedCardIds.filter(id => typeof id === 'string')),
+			setsFound: parsed.setsFound,
+		};
 	} catch {
 		return null;
 	}
 }
 
 export
-function clearDailyBoardState(): void {
-	localStorage.removeItem(todayKey());
+function clearDailyBoardState(
+	date: string,
+	storage: Pick<Storage, 'removeItem'> = localStorage,
+): void {
+	storage.removeItem(boardKey(date));
 }

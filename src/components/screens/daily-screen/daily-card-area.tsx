@@ -63,6 +63,7 @@ function DailyCardArea(props: Props) {
 						size={1}
 					>
 						<Box
+							data-card-id={cardId}
 							sx={{
 								maxWidth: '80%',
 								width: '100%',

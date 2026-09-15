@@ -2,10 +2,13 @@ import { getPacificDate } from './pacific-date';
 
 const STREAK_STORAGE_KEY = 'daily-streak-data';
 
-interface DailyStreakData {
-	currentStreak: number;
-	lastCompletionDate: string; // "YYYY-MM-DD"
+export interface DailyStreakData {
+	readonly currentStreak: number;
+	readonly lastCompletionDate: string;
 }
+
+type StreakReader = Pick<Storage, 'getItem'>;
+type StreakWriter = Pick<Storage, 'getItem' | 'setItem'>;
 
 export
 function formatDate(date: Date): string {
@@ -16,27 +19,29 @@ function todayPacific(): string {
 	return formatDate(getPacificDate());
 }
 
+function isDailyStreakData(value: unknown): value is DailyStreakData {
+	if (typeof value !== 'object' || value === null) return false;
+	if (!('currentStreak' in value) || !('lastCompletionDate' in value)) return false;
+	return typeof value.currentStreak === 'number' && typeof value.lastCompletionDate === 'string';
+}
+
 function parseDailyStreakData(raw: string | null): DailyStreakData | null {
 	if (!raw) return null;
 
 	try {
 		const parsed: unknown = JSON.parse(raw);
-
-		if (
-			typeof parsed === 'object' &&
-			parsed !== null &&
-			'currentStreak' in parsed &&
-			'lastCompletionDate' in parsed &&
-			typeof (parsed as DailyStreakData).currentStreak === 'number' &&
-			typeof (parsed as DailyStreakData).lastCompletionDate === 'string'
-		) {
-			return parsed as DailyStreakData;
-		}
-
-		return null;
+		return isDailyStreakData(parsed) ? parsed : null;
 	} catch {
 		return null;
 	}
+}
+
+function emptyStreak(): DailyStreakData {
+	return { currentStreak: 0, lastCompletionDate: '' };
+}
+
+function readStoredStreak(storage: StreakReader): DailyStreakData {
+	return parseDailyStreakData(storage.getItem(STREAK_STORAGE_KEY)) ?? emptyStreak();
 }
 
 function daysBetween(dateStrA: string, dateStrB: string): number {
@@ -46,18 +51,16 @@ function daysBetween(dateStrA: string, dateStrB: string): number {
 }
 
 export
-function getDailyStreakData(): DailyStreakData {
-	const raw = localStorage.getItem(STREAK_STORAGE_KEY);
-	const data = parseDailyStreakData(raw);
-
-	if (!data) {
-		return { currentStreak: 0, lastCompletionDate: '' };
+function getDailyStreakData(
+	today: string = todayPacific(),
+	storage: StreakReader = localStorage,
+): DailyStreakData {
+	const data = readStoredStreak(storage);
+	if (!data.lastCompletionDate) {
+		return data;
 	}
 
-	// Streak is broken if last completion was more than 1 day ago
-	const today = todayPacific();
-	const gap = data.lastCompletionDate ? daysBetween(today, data.lastCompletionDate) : Infinity;
-
+	const gap = daysBetween(today, data.lastCompletionDate);
 	if (gap > 1) {
 		return { currentStreak: 0, lastCompletionDate: data.lastCompletionDate };
 	}
@@ -66,36 +69,51 @@ function getDailyStreakData(): DailyStreakData {
 }
 
 export
-function recordDailyCompletion(): DailyStreakData {
-	const today = todayPacific();
-	const existing = getDailyStreakData();
-
-	// Already completed today
-	if (existing.lastCompletionDate === today) {
+function recordDailyCompletion(
+	completionDate: string,
+	storage: StreakWriter = localStorage,
+): DailyStreakData {
+	const existing = readStoredStreak(storage);
+	if (existing.lastCompletionDate === completionDate) {
 		return existing;
 	}
 
-	const gap = existing.lastCompletionDate ? daysBetween(today, existing.lastCompletionDate) : Infinity;
-	const newStreak = gap === 1 ? existing.currentStreak + 1 : 1;
+	if (existing.lastCompletionDate > completionDate) {
+		return existing;
+	}
 
+	const gap = existing.lastCompletionDate
+		? daysBetween(completionDate, existing.lastCompletionDate)
+		: Infinity;
 	const updated: DailyStreakData = {
-		currentStreak: newStreak,
-		lastCompletionDate: today,
+		currentStreak: gap === 1 ? existing.currentStreak + 1 : 1,
+		lastCompletionDate: completionDate,
 	};
 
-	localStorage.setItem(STREAK_STORAGE_KEY, JSON.stringify(updated));
-
+	storage.setItem(STREAK_STORAGE_KEY, JSON.stringify(updated));
 	return updated;
 }
 
 export
-function isDailyCompletedToday(): boolean {
-	const data = getDailyStreakData();
-	const today = todayPacific();
-	return data.lastCompletionDate === today;
+function isDailyCompletedOn(
+	date: string,
+	storage: StreakReader = localStorage,
+): boolean {
+	return readStoredStreak(storage).lastCompletionDate === date;
 }
 
 export
-function getCurrentStreak(): number {
-	return getDailyStreakData().currentStreak;
+function isDailyCompletedToday(
+	today: string = todayPacific(),
+	storage: StreakReader = localStorage,
+): boolean {
+	return isDailyCompletedOn(today, storage);
+}
+
+export
+function getCurrentStreak(
+	today: string = todayPacific(),
+	storage: StreakReader = localStorage,
+): number {
+	return getDailyStreakData(today, storage).currentStreak;
 }

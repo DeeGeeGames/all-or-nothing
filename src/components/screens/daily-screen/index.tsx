@@ -1,10 +1,20 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Card, Screens } from '@/types';
-import { isSet } from '@/core';
+import { isSet, setExists } from '@/core';
 import { generateDailyBoard } from '@/daily/daily-board';
 import { getPacificDate, formatPacificDate } from '@/daily/pacific-date';
-import { recordDailyCompletion, isDailyCompletedToday, getCurrentStreak } from '@/daily/daily-streaks';
+import {
+	formatDate,
+	getDailyStreakData,
+	isDailyCompletedOn,
+	recordDailyCompletion,
+} from '@/daily/daily-streaks';
 import { saveDailyBoardState, loadDailyBoardState, clearDailyBoardState } from '@/daily/daily-board-state';
+import {
+	applyDailyCardPick,
+	remainingUnflippedCards,
+	shouldRecordDailyCompletion,
+} from '@/daily/daily-completion';
 import { useSetActiveScreen, useActiveController } from '@/atoms';
 import { useSoundEffects } from '@/hooks';
 import { useSetActiveGroup } from '@/focus/focus-atoms';
@@ -31,36 +41,54 @@ import { useGameTheme } from '@/themes';
 import { noisePattern } from '@/constants';
 
 function initDailyState() {
-	const today = getPacificDate();
-	const cards = generateDailyBoard(today);
-	const saved = loadDailyBoardState();
-	const streakRecorded = isDailyCompletedToday();
+	// Capture the Pacific date at mount. A screen left open across midnight
+	// must still complete this board, not the next day's challenge.
+	const boardDateObj = getPacificDate();
+	const boardDate = formatDate(boardDateObj);
+	const cards = generateDailyBoard(boardDateObj);
+	const saved = loadDailyBoardState(boardDate);
+	const savedFlippedCardIds = saved?.flippedCardIds ?? new Set<string>();
+	const savedSetsFound = saved?.setsFound ?? 0;
+	const alreadyCompleted = isDailyCompletedOn(boardDate);
+	const hasRemainingSet = setExists(remainingUnflippedCards(cards, savedFlippedCardIds));
+	const shouldReconcile = shouldRecordDailyCompletion({
+		alreadyCompleted,
+		source: 'restore',
+		hasRemainingSet,
+		flippedCount: savedFlippedCardIds.size,
+	});
+	const streakData = shouldReconcile
+		? recordDailyCompletion(boardDate)
+		: getDailyStreakData();
 
 	return {
 		cards,
-		dateLabel: formatPacificDate(today),
-		savedFlippedCardIds: saved?.flippedCardIds ?? new Set<string>(),
-		savedSetsFound: saved?.setsFound ?? 0,
-		streakRecorded,
+		boardDate,
+		dateLabel: formatPacificDate(boardDateObj),
+		savedFlippedCardIds,
+		savedSetsFound,
+		streakRecorded: alreadyCompleted || shouldReconcile,
+		streak: streakData.currentStreak,
 	};
 }
 
 export default
 function DailyScreen() {
 	const [initialState] = useState(initDailyState);
-	const { cards, dateLabel, savedFlippedCardIds, savedSetsFound } = initialState;
+	const { cards, boardDate, dateLabel, savedFlippedCardIds, savedSetsFound } = initialState;
 	const [selectedCardIds, setSelectedCardIds] = useState<ReadonlySet<string>>(new Set());
 	const [flippedCardIds, setFlippedCardIds] = useState<ReadonlySet<string>>(savedFlippedCardIds);
 	const [setsFound, setSetsFound] = useState(savedSetsFound);
 	const [streakRecorded, setStreakRecorded] = useState(initialState.streakRecorded);
-	const [streak, setStreak] = useState(getCurrentStreak);
+	const [streak, setStreak] = useState(initialState.streak);
 	const setActiveScreen = useSetActiveScreen();
 	const setActiveGroup = useSetActiveGroup();
 	const activeController = useActiveController();
 	const playSound = useSoundEffects();
 	const gameTheme = useGameTheme();
 
-	const noSetsDisabled = streakRecorded || setsFound > 0;
+	const remainingHasSet = setExists(remainingUnflippedCards(cards, flippedCardIds));
+	const noSetsDisabled = streakRecorded && !remainingHasSet;
 	const resetDisabled = setsFound === 0;
 
 	// Set focus group for controller navigation
@@ -76,65 +104,58 @@ function DailyScreen() {
 	useBackAction(handleBack);
 
 	const handleCardSelected = useCallback((card: Card) => {
-		const cardId = card.id ?? '';
-		if (flippedCardIds.has(cardId)) return;
-
-		setSelectedCardIds(prev => {
-			// Toggle selection
-			if (prev.has(cardId)) {
-				const next = new Set(prev);
-				next.delete(cardId);
-				return next;
-			}
-
-			const next = new Set(prev);
-			next.add(cardId);
-
-			// Check for set when 3 cards selected
-			if (next.size === 3) {
-				const selectedCards = cards.filter(c => next.has(c.id ?? ''));
-
-				if (selectedCards.length === 3) {
-					const [a, b, c] = selectedCards as [Card, Card, Card];
-
-					if (isSet(a, b, c)) {
-						playSound('success');
-						const nextFlipped = new Set(flippedCardIds);
-						next.forEach(id => nextFlipped.add(id));
-
-						setFlippedCardIds(nextFlipped);
-						setSetsFound(prev => {
-							const newCount = prev + 1;
-							saveDailyBoardState(nextFlipped, newCount);
-							return newCount;
-						});
-					} else {
-						playSound('flip1');
-					}
-				}
-
-				// Clear selection after checking
-				return new Set();
-			}
-
-			return next;
+		const result = applyDailyCardPick({
+			cards,
+			selectedIds: selectedCardIds,
+			flippedIds: flippedCardIds,
+			setsFound,
+			cardId: card.id ?? '',
+			isSet,
+			hasSet: setExists,
 		});
-	}, [cards, flippedCardIds, playSound]);
+
+		if (result.kind === 'noop') return;
+
+		setSelectedCardIds(result.selectedIds);
+
+		if (result.kind === 'miss') {
+			playSound('flip1');
+			return;
+		}
+
+		if (result.kind !== 'set') return;
+
+		playSound('success');
+		setFlippedCardIds(result.flippedIds);
+		setSetsFound(result.setsFound);
+		saveDailyBoardState(boardDate, result.flippedIds, result.setsFound);
+
+		if (!result.completed) return;
+
+		const streakData = recordDailyCompletion(boardDate);
+		setStreak(streakData.currentStreak);
+		setStreakRecorded(true);
+	}, [boardDate, cards, flippedCardIds, playSound, selectedCardIds, setsFound]);
 
 	const handleNoSets = useCallback(() => {
 		if (noSetsDisabled) return;
 
-		const streakData = recordDailyCompletion();
+		if (remainingHasSet) {
+			playSound('flip1');
+			return;
+		}
+
+		const streakData = recordDailyCompletion(boardDate);
 		setStreak(streakData.currentStreak);
 		setStreakRecorded(true);
-	}, [noSetsDisabled]);
+	}, [boardDate, noSetsDisabled, playSound, remainingHasSet]);
 
 	const handleReset = useCallback(() => {
 		setFlippedCardIds(new Set());
 		setSetsFound(0);
 		setSelectedCardIds(new Set());
-		clearDailyBoardState();
-	}, []);
+		clearDailyBoardState(boardDate);
+	}, [boardDate]);
 
 	// Controller: SHUFFLE action triggers "No Sets", HINT action triggers "Reset"
 	const inputHandlerRef = useRef<(event: InputEvent) => void>(() => {});
