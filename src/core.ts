@@ -32,11 +32,11 @@ import {
 	migrateLegacyRun,
 	resolveRunFromSave,
 	shouldRecordHistory,
-	shouldSubmitScore,
 	toRunRecord,
 	type GameRunRecord,
 	type GameRunState,
 } from './game-run';
+import { createScoreSubmissionCoordinator } from './score-submission';
 
 export
 interface GameHistoryEntry {
@@ -49,6 +49,7 @@ interface GameHistoryEntry {
 	readonly setsFound: number;
 	readonly misses: number;
 	readonly fastestScore: number;
+	readonly scoreSubmitted?: boolean;
 }
 import {
 	BitwiseValue,
@@ -697,27 +698,58 @@ async function completeNoSetsRun(
 	});
 }
 
+const coordinateScoreSubmission = createScoreSubmissionCoordinator();
+
 export
-async function submitRunScore(
+function submitRunScore(
+	entry: GameHistoryEntry,
 	submit: (data: GameCompletionData) => Promise<boolean>,
 ): Promise<boolean> {
-	const run = await getCurrentRun();
-	if (!shouldSubmitScore(run)) {
-		return run.scoreSubmitted;
-	}
+	return coordinateScoreSubmission(
+		{
+			runId: entry.id,
+			score: completionDataFromHistory(entry),
+		},
+		submit,
+		{
+			isSubmitted: isRunScoreSubmitted,
+			markSubmitted: markRunScoreSubmitted,
+		},
+	);
+}
 
-	try {
-		const success = await submit(await getGameCompletionData());
-		if (!success) {
-			return false;
-		}
-	} catch {
-		return false;
-	}
+function completionDataFromHistory(entry: GameHistoryEntry): GameCompletionData {
+	return {
+		score: entry.score,
+		time: entry.time,
+		maxCombo: entry.maxCombo,
+		fastestMatch: entry.fastestScore,
+	};
+}
 
-	const latest = await getCurrentRun();
-	await db.gamerun.put(toRunRecord(markScoreSubmitted(latest)));
-	return true;
+async function isRunScoreSubmitted(runId: string) {
+	const [entry, run] = await Promise.all([
+		db.gamehistory.get(runId),
+		getCurrentRun(),
+	]);
+	return entry?.scoreSubmitted === true || (run.runId === runId && run.scoreSubmitted);
+}
+
+async function markRunScoreSubmitted(runId: string) {
+	await db.transaction('rw', db.gamehistory, db.gamerun, async () => {
+		const [entry, run] = await Promise.all([
+			db.gamehistory.get(runId),
+			getCurrentRun(),
+		]);
+		const historyUpdate = entry
+			? db.gamehistory.update(runId, { scoreSubmitted: true })
+			: Promise.resolve(0);
+		const currentRunUpdate = run.runId === runId
+			? db.gamerun.put(toRunRecord(markScoreSubmitted(run)))
+			: Promise.resolve();
+
+		await Promise.all([historyUpdate, currentRunUpdate]);
+	});
 }
 
 export
@@ -791,6 +823,7 @@ async function buildHistoryEntry(id: string, remainingCards: number): Promise<Ga
 		setsFound: Math.floor((discardPile?.order.length ?? 0) / 3),
 		misses: missesData?.value ?? 0,
 		fastestScore: fastestScoreData?.value ?? 0,
+		scoreSubmitted: false,
 	};
 }
 

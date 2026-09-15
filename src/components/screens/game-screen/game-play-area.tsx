@@ -20,6 +20,7 @@ import {
 	recordGameCompletion,
 	completeNoSetsRun,
 	submitRunScore,
+	type RecordedCompletion,
 } from '@/core';
 import GameTimer from './game-timer';
 import GameScore from './game-score';
@@ -147,27 +148,7 @@ function GamePlayArea() {
 		if (gameCompletionRecordedRef.current) return;
 		gameCompletionRecordedRef.current = true;
 
-		recordGameCompletion(dealtCards.length).then(async ({ entry, isNew }) => {
-			if (isNew) {
-				const historyCount = await getDb().gamehistory.count();
-				const { evaluateAchievements } = await import('@/achievements/evaluate-achievements');
-
-				// TODO: [NOTIFICATION_TRIGGER] evaluateAchievements returns newly unlocked
-				// achievements that can be passed to a notification state atom when the
-				// notification system is implemented.
-				await evaluateAchievements(
-					entry,
-					historyCount,
-					(id) => service.activateAchievement(id),
-				);
-			}
-
-			if (isPlatformAvailable) {
-				await submitRunScore((data) => service.submitScore(data));
-			}
-
-			await triggerCloudSave();
-		});
+		recordGameCompletion(dealtCards.length).then(processRecordedCompletion);
 	}, [gameComplete, dealtCards.length, service, isPlatformAvailable]);
 
 	// Keep input handler in a ref so listeners don't need re-registration
@@ -339,6 +320,28 @@ function GamePlayArea() {
 		setScorePopups(prev => prev.filter(p => p.id !== id));
 	}
 
+	async function processRecordedCompletion({ entry, isNew }: RecordedCompletion) {
+		if (isNew) {
+			const historyCount = await getDb().gamehistory.count();
+			const { evaluateAchievements } = await import('@/achievements/evaluate-achievements');
+
+			// TODO: [NOTIFICATION_TRIGGER] evaluateAchievements returns newly unlocked
+			// achievements that can be passed to a notification state atom when the
+			// notification system is implemented.
+			await evaluateAchievements(
+				entry,
+				historyCount,
+				(id) => service.activateAchievement(id),
+			);
+		}
+
+		if (isPlatformAvailable) {
+			await submitRunScore(entry, data => service.submitScore(data));
+		}
+
+		await triggerCloudSave();
+	}
+
 	async function handleReshuffle() {
 		if (gameplayLockedRef.current || !(dealtCards && deckOrder)) {
 			return;
@@ -355,26 +358,15 @@ function GamePlayArea() {
 			if (deckExhausted) return;
 		} else if (deckExhausted) {
 			gameplayLockedRef.current = true;
+			gameCompletionRecordedRef.current = true;
 			const result = await completeNoSetsRun(time, dealtCards.length);
 			const payout = result.payout;
 			if (payout) {
 				setScorePopups(prev => [...prev, createScorePopup('reward', payout.pointsAwarded, payout.comboCount)]);
 			}
-			if (result.isNew) {
-				const historyCount = await getDb().gamehistory.count();
-				const { evaluateAchievements } = await import('@/achievements/evaluate-achievements');
-				await evaluateAchievements(
-					result.entry,
-					historyCount,
-					(id) => service.activateAchievement(id),
-				);
-			}
-			if (isPlatformAvailable) {
-				await submitRunScore((data) => service.submitScore(data));
-			}
-			gameCompletionRecordedRef.current = true;
 			setManualGameComplete(true);
 			triggerCloudSave();
+			processRecordedCompletion(result);
 			return;
 		} else {
 			const result = await awardMatchScore(time);
@@ -436,4 +428,3 @@ function GamePlayArea() {
 		}
 	}
 }
-

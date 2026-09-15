@@ -36,6 +36,7 @@ export function generateGameHistory({
 			setsFound: Math.max(1, setsFound),
 			misses,
 			fastestScore: Math.max(1, Math.round(fastestScore)),
+			scoreSubmitted: true,
 		};
 	});
 }
