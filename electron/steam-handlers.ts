@@ -11,6 +11,13 @@ function debugLog(msg: string): void {
 	try { appendFileSync(debugLogPath, line); } catch { /* best effort */ }
 }
 import { SteamworksSDK, SteamInputType, LeaderboardSortMethod, LeaderboardDisplayType, LeaderboardDataRequest, LeaderboardUploadScoreMethod } from 'steamworks-ffi-node';
+import {
+	STEAM_LEADERBOARD_BASE_NAMES,
+	fromSteamDownloadValue,
+	isSteamLeaderboardMetric,
+	resolveSteamBoardName,
+	steamSubmitEntries,
+} from '../src/platform/steam-leaderboard-units';
 
 const steam = SteamworksSDK.getInstance();
 let steamInitialized = false;
@@ -74,10 +81,10 @@ async function getLeaderboardHandle(name: string, sortMethod: LeaderboardSortMet
 }
 
 const STEAM_LEADERBOARDS = {
-	score: { name: 'Highscores_v3', sort: LeaderboardSortMethod.Descending, display: LeaderboardDisplayType.Numeric },
-	time: { name: 'BestTimes_v3', sort: LeaderboardSortMethod.Ascending, display: LeaderboardDisplayType.TimeMilliseconds },
-	combo: { name: 'MaxCombo_v3', sort: LeaderboardSortMethod.Descending, display: LeaderboardDisplayType.Numeric },
-	fastestMatch: { name: 'FastestMatch_v3', sort: LeaderboardSortMethod.Ascending, display: LeaderboardDisplayType.TimeSeconds },
+	score: { name: STEAM_LEADERBOARD_BASE_NAMES.score, sort: LeaderboardSortMethod.Descending, display: LeaderboardDisplayType.Numeric },
+	time: { name: STEAM_LEADERBOARD_BASE_NAMES.time, sort: LeaderboardSortMethod.Ascending, display: LeaderboardDisplayType.TimeMilliseconds },
+	combo: { name: STEAM_LEADERBOARD_BASE_NAMES.combo, sort: LeaderboardSortMethod.Descending, display: LeaderboardDisplayType.Numeric },
+	fastestMatch: { name: STEAM_LEADERBOARD_BASE_NAMES.fastestMatch, sort: LeaderboardSortMethod.Ascending, display: LeaderboardDisplayType.TimeSeconds },
 } as const;
 
 const FETCH_TYPE_MAP: Readonly<Record<string, LeaderboardDataRequest>> = {
@@ -85,36 +92,6 @@ const FETCH_TYPE_MAP: Readonly<Record<string, LeaderboardDataRequest>> = {
 	'around-user': LeaderboardDataRequest.GlobalAroundUser,
 	'friends': LeaderboardDataRequest.Friends,
 };
-
-function getISOWeek(date: Date): { year: number; week: number } {
-	const target = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-	// Set to nearest Thursday (ISO weeks start on Monday, week 1 contains Jan 4)
-	target.setUTCDate(target.getUTCDate() + 3 - ((target.getUTCDay() + 6) % 7));
-	const jan4 = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
-	const week = 1 + Math.round(((target.getTime() - jan4.getTime()) / 86400000 - 3 + ((jan4.getUTCDay() + 6) % 7)) / 7);
-	return { year: target.getUTCFullYear(), week };
-}
-
-function getCurrentMonthSuffix(): string {
-	const now = new Date();
-	return `Monthly_${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-}
-
-function getCurrentWeekSuffix(): string {
-	const { year, week } = getISOWeek(new Date());
-	return `Weekly_${year}W${String(week).padStart(2, '0')}`;
-}
-
-const PERIOD_SUFFIX_RESOLVERS: Readonly<Record<string, (() => string) | null>> = {
-	'alltime': null,
-	'monthly': getCurrentMonthSuffix,
-	'weekly': getCurrentWeekSuffix,
-};
-
-function resolveBoardName(baseName: string, period: string): string {
-	const resolver = PERIOD_SUFFIX_RESOLVERS[period];
-	return resolver ? `${baseName}_${resolver()}` : baseName;
-}
 
 const STEAM_ACTION_NAMES = [
 	'select',
@@ -362,24 +339,13 @@ export function registerSteamHandlers(appId: number) {
 	ipcMain.handle('steam:submitScore', async (_event, data: { score: number; time: number; maxCombo: number; fastestMatch: number }) => {
 		if (!steamInitialized) return false;
 		try {
-			const metrics = [
-				{ key: 'score' as const, value: data.score },
-				{ key: 'time' as const, value: data.time },
-				{ key: 'combo' as const, value: data.maxCombo },
-				...(data.fastestMatch > 0 ? [{ key: 'fastestMatch' as const, value: data.fastestMatch }] : []),
-			];
-			const periods = Object.keys(PERIOD_SUFFIX_RESOLVERS);
-
 			const results = await Promise.allSettled(
-				metrics.flatMap(({ key, value }) => {
-					const lb = STEAM_LEADERBOARDS[key];
-					return periods.map(async (period) => {
-						const boardName = resolveBoardName(lb.name, period);
-						const handle = await getLeaderboardHandle(boardName, lb.sort, lb.display);
-						if (!handle) return false;
-						const result = await steam.leaderboards.uploadScore(handle, value, LeaderboardUploadScoreMethod.KeepBest);
-						return result?.success ?? false;
-					});
+				steamSubmitEntries(data).map(async ({ metric, boardName, value }) => {
+					const lb = STEAM_LEADERBOARDS[metric];
+					const handle = await getLeaderboardHandle(boardName, lb.sort, lb.display);
+					if (!handle) return false;
+					const result = await steam.leaderboards.uploadScore(handle, value, LeaderboardUploadScoreMethod.KeepBest);
+					return result?.success ?? false;
 				})
 			);
 
@@ -392,14 +358,13 @@ export function registerSteamHandlers(appId: number) {
 	ipcMain.handle('steam:fetchLeaderboard', async (_event, options: { leaderboard: string; fetchType: string; period: string; rangeStart: number; rangeEnd: number }) => {
 		if (!steamInitialized) return [];
 		try {
-			const boardKey = options.leaderboard as keyof typeof STEAM_LEADERBOARDS;
-			const lb = STEAM_LEADERBOARDS[boardKey];
-			if (!lb) return [];
+			if (!isSteamLeaderboardMetric(options.leaderboard)) return [];
+			const lb = STEAM_LEADERBOARDS[options.leaderboard];
 
 			const dataRequest = FETCH_TYPE_MAP[options.fetchType];
 			if (dataRequest === undefined) return [];
 
-			const boardName = resolveBoardName(lb.name, options.period ?? 'alltime');
+			const boardName = resolveSteamBoardName(lb.name, options.period ?? 'alltime');
 			const handle = await getLeaderboardHandle(boardName, lb.sort, lb.display);
 			if (!handle) return [];
 
@@ -408,7 +373,7 @@ export function registerSteamHandlers(appId: number) {
 			return entries.map(entry => ({
 				rank: entry.globalRank,
 				playerName: steam.friends.getFriendPersonaName(entry.steamId) || entry.steamId,
-				score: entry.score,
+				score: fromSteamDownloadValue(options.leaderboard, entry.score),
 			}));
 		} catch {
 			return [];

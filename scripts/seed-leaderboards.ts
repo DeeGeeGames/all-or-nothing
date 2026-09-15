@@ -15,9 +15,17 @@
 // Run with:
 //   npx tsx scripts/seed-leaderboards.ts
 //
+import {
+	STEAM_LEADERBOARD_BASE_NAMES,
+	gameSecondsToSteamTimeMilliseconds,
+	isoWeek,
+	monthlySuffix,
+} from '../src/platform/steam-leaderboard-units';
+
 // Notes:
-//   - Board config below MUST mirror electron/steam-handlers.ts STEAM_LEADERBOARDS.
-//     If you bump the version suffix or change sort/display there, mirror it here.
+//   - Board names and BestTimes units MUST mirror src/platform/steam-leaderboard-units.ts
+//     and electron/steam-handlers.ts. BestTimes_v3 is abandoned: production mixed seed
+//     milliseconds with live second scores, and ascending KeepBest cannot repair it.
 //   - Boards are created on demand via FindOrCreateLeaderboard, so a fresh appid
 //     with zero existing boards is fine — running this script will create every
 //     metric × period combo and seed it in one pass.
@@ -40,10 +48,10 @@ interface MetricConfig {
 }
 
 const METRIC_CONFIG = {
-	Highscores_v3:   { sort: 'Descending', display: 'Numeric' },
-	BestTimes_v3:    { sort: 'Ascending',  display: 'TimeMilliSeconds' },
-	MaxCombo_v3:     { sort: 'Descending', display: 'Numeric' },
-	FastestMatch_v3: { sort: 'Ascending',  display: 'TimeSeconds' },
+	[STEAM_LEADERBOARD_BASE_NAMES.score]:        { sort: 'Descending', display: 'Numeric' },
+	[STEAM_LEADERBOARD_BASE_NAMES.time]:         { sort: 'Ascending',  display: 'TimeMilliSeconds' },
+	[STEAM_LEADERBOARD_BASE_NAMES.combo]:        { sort: 'Descending', display: 'Numeric' },
+	[STEAM_LEADERBOARD_BASE_NAMES.fastestMatch]: { sort: 'Ascending',  display: 'TimeSeconds' },
 } as const satisfies Readonly<Record<string, MetricConfig>>;
 
 type Metric = keyof typeof METRIC_CONFIG;
@@ -59,32 +67,20 @@ const MONTHLY_LOOKAHEAD = 3;
 // Synthetic scores per metric. Index N is paired with SEED_STEAM_IDS[N % len].
 // Units must match the leaderboard's display type:
 //   Highscores_v3:   raw points
-//   BestTimes_v3:    milliseconds (lower is better)
+//   BestTimes_v4:    milliseconds (lower is better) — game seconds * 1000
 //   MaxCombo_v3:     raw count
 //   FastestMatch_v3: seconds (lower is better)
 const SEED_SCORES: Readonly<Record<Metric, readonly number[]>> = {
-	Highscores_v3:   [1500, 1000],
-	BestTimes_v3:    [360000, 420000],
-	MaxCombo_v3:     [3, 2],
-	FastestMatch_v3: [20, 30],
+	[STEAM_LEADERBOARD_BASE_NAMES.score]:        [1500, 1000],
+	[STEAM_LEADERBOARD_BASE_NAMES.time]:         [gameSecondsToSteamTimeMilliseconds(360), gameSecondsToSteamTimeMilliseconds(420)],
+	[STEAM_LEADERBOARD_BASE_NAMES.combo]:        [3, 2],
+	[STEAM_LEADERBOARD_BASE_NAMES.fastestMatch]: [20, 30],
 } as const;
 
 function requireEnv(name: string): string {
 	const value = process.env[name];
 	if (!value) throw new Error(`Missing required env var: ${name}`);
 	return value;
-}
-
-function getISOWeek(date: Date): { readonly year: number; readonly week: number } {
-	const target = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-	target.setUTCDate(target.getUTCDate() + 3 - ((target.getUTCDay() + 6) % 7));
-	const jan4 = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
-	const week = 1 + Math.round(((target.getTime() - jan4.getTime()) / 86400000 - 3 + ((jan4.getUTCDay() + 6) % 7)) / 7);
-	return { year: target.getUTCFullYear(), week };
-}
-
-function monthlySuffix(date: Date): string {
-	return `Monthly_${date.getUTCFullYear()}${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 // Each period yields a list of suffixes (or `null` for the un-suffixed all-time
@@ -99,7 +95,7 @@ const periodSuffixListResolvers: Readonly<Record<Period, () => readonly (string 
 		);
 	},
 	weekly: () => {
-		const { year, week } = getISOWeek(new Date());
+		const { year, week } = isoWeek(new Date());
 		return [`Weekly_${year}W${String(week).padStart(2, '0')}`];
 	},
 };
