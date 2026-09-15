@@ -19,6 +19,7 @@ interface Props {
 	discardingCardIds: string[];
 	raised?: boolean;
 	paused?: boolean;
+	interactionLocked?: boolean;
 	onSelected(card: Card): void;
 	onMismatchAnimationComplete(): void;
 	onDiscardAnimationComplete(cardIds: string[]): void;
@@ -28,6 +29,7 @@ interface Props {
 function FocusableCard({
 	card,
 	paused,
+	interactionLocked,
 	raised,
 	selected,
 	mismatching,
@@ -40,6 +42,7 @@ function FocusableCard({
 }: {
 	card: Card;
 	paused: boolean;
+	interactionLocked: boolean;
 	selected: boolean;
 	mismatching?: boolean;
 	raised?: boolean;
@@ -51,8 +54,12 @@ function FocusableCard({
 	gridPosition: { row: number; col: number };
 }) {
 	const handleSelect = useCallback(() => {
+		if (interactionLocked) {
+			return;
+		}
+
 		onSelected(card);
-	}, [card, onSelected]);
+	}, [card, onSelected, interactionLocked]);
 
 	const handleCardSelection = useActivationGuard(handleSelect);
 
@@ -61,7 +68,7 @@ function FocusableCard({
 		group: 'cards',
 		gridPosition,
 		onSelect: handleCardSelection, // Use wrapped function for keyboard/controller
-		disabled: paused,
+		disabled: paused || interactionLocked,
 	});
 
 	return (
@@ -87,6 +94,7 @@ function GameCardArea(props: Props) {
 		shuffleGeneration: rawShuffleGeneration,
 		cards: unDebouncedRawCards,
 		paused,
+		interactionLocked = false,
 		selectedCards,
 		mismatchingCardIds,
 		discardingCardIds,
@@ -149,6 +157,7 @@ function GameCardArea(props: Props) {
 				sm: 6,
 			}}
 			sx={{
+				pointerEvents: interactionLocked ? 'none' : 'auto',
 				height: {
 					xs: '100%',
 					sm: 'auto',
@@ -273,6 +282,7 @@ function GameCardArea(props: Props) {
 										spin={isDiscarding}
 										dealt={!newCards.find(newCard => newCard.id === card.id)}
 										paused={paused || isDiscarding || isMismatching || !!newCards.find(newCard => newCard.id === card.id)}
+										interactionLocked={interactionLocked}
 										selected={!!card.id && selectedCards.includes(card.id)}
 										mismatching={isMismatching}
 										showFocus={usingNavigationalInput}

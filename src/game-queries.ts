@@ -12,6 +12,7 @@ import {
 	DbCollectionItemNameGameDataMaxCombo,
 	DbCollectionItemNameSetOrdersDeck,
 	DbCollectionItemNameSetOrdersDiscard,
+	DbCollectionItemNameGameRun,
 } from '@/constants';
 
 const db = getDb();
@@ -59,4 +60,8 @@ export function useLastMatchTime() {
 
 export function useMaxCombo() {
 	return useLiveQuery(() => db.gamedata.get(DbCollectionItemNameGameDataMaxCombo))?.value || 0;
+}
+
+export function useGameRun() {
+	return useLiveQuery(() => db.gamerun.get(DbCollectionItemNameGameRun).then(run => run ?? null));
 }

@@ -18,6 +18,8 @@ import {
 	penalizeUnnecessaryShuffle,
 	resetComboState,
 	recordGameCompletion,
+	completeNoSetsRun,
+	submitRunScore,
 } from '@/core';
 import GameTimer from './game-timer';
 import GameScore from './game-score';
@@ -36,7 +38,7 @@ import { getGamepadManager } from '@/input/gamepad-manager';
 import { getKeyboardManager } from '@/input/keyboard-manager';
 import { InputAction, InputEvent } from '@/input/input-types';
 import { BoardCardCount } from '@/constants';
-import { useDeck, useTime, useScore, useDeckOrder, useDiscardPile, useMaxCombo } from '@/game-queries';
+import { useDeck, useTime, useScore, useDeckOrder, useDiscardPile, useMaxCombo, useGameRun } from '@/game-queries';
 import { usePlatform } from '@/platform';
 
 const {
@@ -45,11 +47,12 @@ const {
 
 export default
 function GamePlayArea() {
-	const { service, isReady: isPlatformReady } = usePlatform();
+	const { service, isReady: isPlatformReady, isAvailable: isPlatformAvailable } = usePlatform();
 	const deck = useDeck();
 	const time = useTime();
 	const score = useScore();
 	const maxCombo = useMaxCombo();
+	const runRecord = useGameRun();
 	const soundEffects = useSoundEffects();
 	const [shuffleGeneration, setShuffleGeneration] = useState(0);
 	const paused = useIsPaused();
@@ -66,12 +69,17 @@ function GamePlayArea() {
 	const discardPile = useDiscardPile();
 	const dealtCards = deck?.slice(0, BoardCardCount);
 	const animatedCardsLeft = useAnimatedNumber(deck.length);
-	const canShuffle = deck.length > 0 && discardingCards.length === 0;
+	const gameplayLockedRef = useRef(false);
 
 	const deckLoaded = !!deckOrder;
+	const runLoaded = runRecord !== undefined;
+	const persistedComplete = runRecord?.completed === true;
 	const gameComplete = useMemo(() => (
-		deckLoaded && (manualGameComplete || deck.length === 0)
-	), [deckLoaded, manualGameComplete, deck.length]);
+		deckLoaded && (persistedComplete || manualGameComplete || deck.length === 0)
+	), [deckLoaded, persistedComplete, manualGameComplete, deck.length]);
+	const gameplayLocked = !runLoaded || gameComplete;
+	gameplayLockedRef.current = gameplayLocked;
+	const canShuffle = deck.length > 0 && discardingCards.length === 0 && !gameplayLocked;
 
 	async function triggerCloudSave() {
 		try {
@@ -100,7 +108,7 @@ function GamePlayArea() {
 	}, [gameGeneration]);
 
 	// Periodically save to cloud so the timer stays in sync
-	const runPeriodicSave = isPlatformReady && !gameComplete && !paused;
+	const runPeriodicSave = isPlatformReady && !gameplayLocked && !paused;
 	useInterval(() => {
 		triggerCloudSave();
 	}, runPeriodicSave ? 3000 : null);
@@ -121,6 +129,7 @@ function GamePlayArea() {
 			setSelectedCards([]);
 			setDiscardingCards([]);
 			setManualGameComplete(false);
+			gameplayLockedRef.current = false;
 			setGameGeneration(g => g + 1);
 		}
 
@@ -138,20 +147,28 @@ function GamePlayArea() {
 		if (gameCompletionRecordedRef.current) return;
 		gameCompletionRecordedRef.current = true;
 
-		recordGameCompletion(dealtCards.length).then(async (entry) => {
-			const historyCount = await getDb().gamehistory.count();
-			const { evaluateAchievements } = await import('@/achievements/evaluate-achievements');
+		recordGameCompletion(dealtCards.length).then(async ({ entry, isNew }) => {
+			if (isNew) {
+				const historyCount = await getDb().gamehistory.count();
+				const { evaluateAchievements } = await import('@/achievements/evaluate-achievements');
 
-			// TODO: [NOTIFICATION_TRIGGER] evaluateAchievements returns newly unlocked
-			// achievements that can be passed to a notification state atom when the
-			// notification system is implemented.
-			await evaluateAchievements(
-				entry,
-				historyCount,
-				(id) => service.activateAchievement(id),
-			);
+				// TODO: [NOTIFICATION_TRIGGER] evaluateAchievements returns newly unlocked
+				// achievements that can be passed to a notification state atom when the
+				// notification system is implemented.
+				await evaluateAchievements(
+					entry,
+					historyCount,
+					(id) => service.activateAchievement(id),
+				);
+			}
+
+			if (isPlatformAvailable) {
+				await submitRunScore((data) => service.submitScore(data));
+			}
+
+			await triggerCloudSave();
 		});
-	}, [gameComplete, dealtCards.length, service]);
+	}, [gameComplete, dealtCards.length, service, isPlatformAvailable]);
 
 	// Keep input handler in a ref so listeners don't need re-registration
 	// when paused/canShuffle/dealtCards change
@@ -159,7 +176,7 @@ function GamePlayArea() {
 	gameInputHandlerRef.current = (event: InputEvent) => {
 		const { action } = event;
 
-		if (action === InputAction.PAUSE) {
+		if (action === InputAction.PAUSE && !gameComplete) {
 			setIsPaused(!paused);
 		}
 
@@ -247,6 +264,7 @@ function GamePlayArea() {
 						mismatchingCardIds={mismatchingCards}
 						discardingCardIds={discardingCards}
 						paused={paused}
+						interactionLocked={gameplayLocked}
 						onSelected={card => card.id && toggleSelected(card.id)}
 						onMismatchAnimationComplete={() => {
 							setMismatchingCards([]);
@@ -286,7 +304,7 @@ function GamePlayArea() {
 						},
 					}}
 				>
-					<GameTimer gameComplete={gameComplete} />
+					<GameTimer gameComplete={gameplayLocked} />
 					<GameScore gameComplete={gameComplete} />
 					<Typography variant="h5" sx={{ fontVariantNumeric: 'tabular-nums' }}>
 						<motion.span>{animatedCardsLeft}</motion.span> cards left
@@ -322,7 +340,7 @@ function GamePlayArea() {
 	}
 
 	async function handleReshuffle() {
-		if (!(dealtCards && deckOrder)) {
+		if (gameplayLockedRef.current || !(dealtCards && deckOrder)) {
 			return;
 		}
 
@@ -335,14 +353,33 @@ function GamePlayArea() {
 				setScorePopups(prev => [...prev, createScorePopup('penalty', penalty)]);
 			}
 			if (deckExhausted) return;
+		} else if (deckExhausted) {
+			gameplayLockedRef.current = true;
+			const result = await completeNoSetsRun(time, dealtCards.length);
+			const payout = result.payout;
+			if (payout) {
+				setScorePopups(prev => [...prev, createScorePopup('reward', payout.pointsAwarded, payout.comboCount)]);
+			}
+			if (result.isNew) {
+				const historyCount = await getDb().gamehistory.count();
+				const { evaluateAchievements } = await import('@/achievements/evaluate-achievements');
+				await evaluateAchievements(
+					result.entry,
+					historyCount,
+					(id) => service.activateAchievement(id),
+				);
+			}
+			if (isPlatformAvailable) {
+				await submitRunScore((data) => service.submitScore(data));
+			}
+			gameCompletionRecordedRef.current = true;
+			setManualGameComplete(true);
+			triggerCloudSave();
+			return;
 		} else {
 			const result = await awardMatchScore(time);
 			if (result) {
 				setScorePopups(prev => [...prev, createScorePopup('reward', result.pointsAwarded, result.comboCount)]);
-			}
-			if (deckExhausted) {
-				setManualGameComplete(true);
-				return;
 			}
 		}
 
@@ -352,7 +389,7 @@ function GamePlayArea() {
 		triggerCloudSave();
 	}
 	async function toggleSelected(cardId: string) {
-		if(!(deckOrder && dealtCards)) {
+		if (gameplayLockedRef.current || !(deckOrder && dealtCards)) {
 			return;
 		}
 

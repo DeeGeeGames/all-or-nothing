@@ -43,6 +43,7 @@
 		"node_modules",
 		"electron",
 		"electron-builder.config.ts",
-		"dist-electron"
+		"dist-electron",
+		"**/*.test.ts"
 	]
 }

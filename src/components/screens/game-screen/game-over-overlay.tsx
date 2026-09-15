@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useRef, useCallback } from 'react';
+import { memo, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Box, Typography } from '@mui/material';
 import {
@@ -10,8 +10,6 @@ import FocusableButton from '@/components/focusable-button';
 import { useSetActiveGroup } from '@/focus/focus-atoms';
 import { useSetActiveScreen } from '@/atoms';
 import { resetGame } from '@/utils';
-import { getGameCompletionData } from '@/core';
-import { usePlatform } from '@/platform';
 import { Screens } from '@/types';
 import { fireGameOverConfetti } from '@/confetti';
 
@@ -60,8 +58,6 @@ function GameOverOverlay(props: Props) {
 
 	const setActiveGroup = useSetActiveGroup();
 	const setActiveScreen = useSetActiveScreen();
-	const { service: platformService, isAvailable: isPlatformAvailable } = usePlatform();
-	const [submitted, setSubmitted] = useState(false);
 	const confettiFiredRef = useRef(false);
 
 	const grade = deriveGrade(score, remainingCards, maxCombo);
@@ -69,7 +65,6 @@ function GameOverOverlay(props: Props) {
 
 	useEffect(() => {
 		if (!isGameOver) {
-			setSubmitted(false);
 			confettiFiredRef.current = false;
 			return;
 		}
@@ -82,21 +77,6 @@ function GameOverOverlay(props: Props) {
 		const cancelConfetti = fireGameOverConfetti(isPerfect);
 		return cancelConfetti;
 	}, [isGameOver, setActiveGroup, isPerfect]);
-
-	useEffect(() => {
-		if (!isGameOver || submitted || !isPlatformAvailable) return;
-
-		let cancelled = false;
-
-		getGameCompletionData()
-			.then(data => platformService.submitScore(data))
-			.then(success => {
-				if (success && !cancelled) setSubmitted(true);
-			})
-			.catch(() => {});
-
-		return () => { cancelled = true; };
-	}, [isGameOver, submitted, isPlatformAvailable, platformService]);
 
 	const handleBackToTitle = useCallback(() => {
 		setActiveScreen(Screens.Title);

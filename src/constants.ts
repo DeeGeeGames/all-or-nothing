@@ -13,6 +13,7 @@ export const DbCollectionItemNameGameDataScoreValue = 'score-value';
 export const DbCollectionItemNameGameDataLastMatchTime = 'last-match-time';
 export const DbCollectionItemNameGameDataComboCount = 'combo-count';
 export const DbCollectionItemNameGameDataMaxCombo = 'max-combo';
+export const DbCollectionItemNameGameRun = 'current' as const;
 export const TutorialCompletedKey = 'tutorialCompleted';
 export const BoardCardCount = 12;
 

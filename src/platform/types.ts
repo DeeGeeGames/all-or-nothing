@@ -55,9 +55,11 @@ interface GameCompletionData {
 	readonly fastestMatch: number;
 }
 
+export const CurrentGameSaveVersion = 4 as const;
+
 export
 interface GameSaveData {
-	readonly version: 1 | 2 | 3;
+	readonly version: 1 | 2 | 3 | typeof CurrentGameSaveVersion;
 	readonly savedAt: number;
 	readonly deck: readonly string[];
 	readonly discard: readonly string[];
@@ -70,6 +72,10 @@ interface GameSaveData {
 	readonly comboCount: number;
 	readonly maxCombo: number;
 	readonly achievements?: readonly { readonly id: string; readonly unlockedAt: number }[];
+	readonly runId?: string;
+	readonly completed?: boolean;
+	readonly historyEntryId?: string | null;
+	readonly scoreSubmitted?: boolean;
 }
 
 export

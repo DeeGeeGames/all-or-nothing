@@ -82,7 +82,7 @@ export function createSteamPlatformService(): PlatformService {
 						fastestScore: 0,
 					} as GameSaveData;
 				}
-				if (version === 2 || version === 3) return parsed as GameSaveData;
+				if (version === 2 || version === 3 || version === 4) return parsed as GameSaveData;
 				return null;
 			} catch {
 				return null;

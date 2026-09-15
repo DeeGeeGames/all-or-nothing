@@ -13,11 +13,30 @@ import {
 	DbCollectionItemNameGameDataMaxCombo,
 	DbCollectionItemNameSetOrdersDeck,
 	DbCollectionItemNameSetOrdersDiscard,
+	DbCollectionItemNameGameRun,
 	DbName,
 	SavedGameKey,
 } from './constants';
-import type { GameCompletionData, GameSaveData } from './platform/types';
+import {
+	CurrentGameSaveVersion,
+	type GameCompletionData,
+	type GameSaveData,
+} from './platform/types';
 import type { UnlockedAchievement } from './achievements/achievement-types';
+import {
+	applyCompletion,
+	canMutateGameplay,
+	createNewRun,
+	fromRunRecord,
+	markScoreSubmitted,
+	migrateLegacyRun,
+	resolveRunFromSave,
+	shouldRecordHistory,
+	shouldSubmitScore,
+	toRunRecord,
+	type GameRunRecord,
+	type GameRunState,
+} from './game-run';
 
 export
 interface GameHistoryEntry {
@@ -170,6 +189,10 @@ const db = new Dexie(DbName) as Dexie & {
 		UnlockedAchievement,
 		'id'
 	>;
+	gamerun: EntityTable<
+		GameRunRecord,
+		'id'
+	>;
 };
 await initDb();
 
@@ -205,6 +228,18 @@ async function initDb() {
 		achievements: '++id, unlockedAt',
 	});
 
+	db.version(4).stores({
+		setorders: '++name, order',
+		gamedata: '++id, value',
+		gamehistory: '++id, completedAt',
+		achievements: '++id, unlockedAt',
+		gamerun: 'id',
+	}).upgrade(async tx => {
+		const deck = await tx.table('setorders').get(DbCollectionItemNameSetOrdersDeck) as SetOrders | undefined;
+		const deckLength = deck?.order.length ?? 1;
+		await tx.table('gamerun').add(toRunRecord(migrateLegacyRun(deckLength)));
+	});
+
 	if(await db.setorders.get(DbCollectionItemNameSetOrdersDeck)) {
 		// Migration for existing databases that don't have max-combo
 		if (!(await db.gamedata.get(DbCollectionItemNameGameDataMaxCombo))) {
@@ -212,6 +247,10 @@ async function initDb() {
 				id: DbCollectionItemNameGameDataMaxCombo,
 				value: 0,
 			});
+		}
+		if (!(await db.gamerun.get(DbCollectionItemNameGameRun))) {
+			const deck = await db.setorders.get(DbCollectionItemNameSetOrdersDeck);
+			await db.gamerun.add(toRunRecord(migrateLegacyRun(deck?.order.length ?? 1)));
 		}
 		return;
 	}
@@ -265,6 +304,7 @@ async function initDb() {
 			name: DbCollectionItemNameSetOrdersDiscard,
 			order: [],
 		}),
+		db.gamerun.add(toRunRecord(createNewRun())),
 	]);
 }
 
@@ -282,20 +322,27 @@ async function resetGameCore() {
 		db.gamedata.update(DbCollectionItemNameGameDataFastestScore, { value: 0 }),
 		db.setorders.update(DbCollectionItemNameSetOrdersDeck, { order: generateDeck() }),
 		db.setorders.update(DbCollectionItemNameSetOrdersDiscard, { order: [] }),
+		db.gamerun.put(toRunRecord(createNewRun())),
 	])
 }
 
 export
 async function resetComboState() {
-	await Promise.all([
-		db.gamedata.update(DbCollectionItemNameGameDataLastMatchTime, { value: 0 }),
-		db.gamedata.update(DbCollectionItemNameGameDataComboCount, { value: 0 }),
-	]);
+	await db.transaction('rw', db.gamedata, db.gamerun, async () => {
+		if (!(await isRunMutable())) {
+			return;
+		}
+
+		await Promise.all([
+			db.gamedata.update(DbCollectionItemNameGameDataLastMatchTime, { value: 0 }),
+			db.gamedata.update(DbCollectionItemNameGameDataComboCount, { value: 0 }),
+		]);
+	});
 }
 
 export
 async function exportGameState(): Promise<GameSaveData> {
-	const [deck, discard, time, misses, score, scoreValue, lastMatchTime, comboCount, maxCombo, fastestScore, achievements] =
+	const [deck, discard, time, misses, score, scoreValue, lastMatchTime, comboCount, maxCombo, fastestScore, achievements, run] =
 		await Promise.all([
 			db.setorders.get(DbCollectionItemNameSetOrdersDeck),
 			db.setorders.get(DbCollectionItemNameSetOrdersDiscard),
@@ -308,9 +355,10 @@ async function exportGameState(): Promise<GameSaveData> {
 			db.gamedata.get(DbCollectionItemNameGameDataMaxCombo),
 			db.gamedata.get(DbCollectionItemNameGameDataFastestScore),
 			db.achievements.toArray(),
+			getCurrentRun(),
 		]);
 	return {
-		version: 3,
+		version: CurrentGameSaveVersion,
 		savedAt: Date.now(),
 		deck: deck?.order ?? [],
 		discard: discard?.order ?? [],
@@ -323,6 +371,10 @@ async function exportGameState(): Promise<GameSaveData> {
 		maxCombo: maxCombo?.value ?? 0,
 		fastestScore: fastestScore?.value ?? 0,
 		achievements: achievements.map(a => ({ id: a.id, unlockedAt: a.unlockedAt })),
+		runId: run.runId,
+		completed: run.completed,
+		historyEntryId: run.historyEntryId,
+		scoreSubmitted: run.scoreSubmitted,
 	};
 }
 
@@ -339,6 +391,7 @@ async function importGameState(data: GameSaveData): Promise<void> {
 		db.gamedata.put({ id: DbCollectionItemNameGameDataLastMatchTime, value: data.lastMatchTime }),
 		db.gamedata.put({ id: DbCollectionItemNameGameDataComboCount, value: data.comboCount }),
 		db.gamedata.put({ id: DbCollectionItemNameGameDataMaxCombo, value: data.maxCombo }),
+		db.gamerun.put(toRunRecord(resolveRunFromSave(data))),
 	]);
 	localStorage.setItem(SavedGameKey, String(data.time));
 
@@ -358,6 +411,10 @@ async function importGameState(data: GameSaveData): Promise<void> {
 
 export
 async function updateTime(newTime: number) {
+	if (!(await isRunMutable())) {
+		return;
+	}
+
 	await db.gamedata.update(DbCollectionItemNameGameDataTime, {
 		value: newTime,
 	});
@@ -367,7 +424,11 @@ async function updateTime(newTime: number) {
 
 export
 async function performTimerTick(newTime: number) {
-	await db.transaction('rw', db.gamedata, async () => {
+	await db.transaction('rw', db.gamedata, db.gamerun, async () => {
+		if (!(await isRunMutable())) {
+			return;
+		}
+
 		const [scoreValueData, lastMatchData, comboData] = await Promise.all([
 			db.gamedata.get(DbCollectionItemNameGameDataScoreValue),
 			db.gamedata.get(DbCollectionItemNameGameDataLastMatchTime),
@@ -396,6 +457,11 @@ async function performTimerTick(newTime: number) {
 
 		await Promise.all(writes);
 	});
+
+	if (!(await isRunMutable())) {
+		return;
+	}
+
 	localStorage.setItem(SavedGameKey, newTime.toString());
 }
 
@@ -428,54 +494,64 @@ async function updateMusicEnabled(enabled: boolean) {
 // Scoring database update functions
 export
 async function awardMatchScore(currentTime: number) {
-	return db.transaction('rw', db.gamedata, async () => {
-		const [scoreData, scoreValueData, lastMatchData, comboData, maxComboData, fastestScoreData] = await Promise.all([
-			db.gamedata.get(DbCollectionItemNameGameDataScore),
-			db.gamedata.get(DbCollectionItemNameGameDataScoreValue),
-			db.gamedata.get(DbCollectionItemNameGameDataLastMatchTime),
-			db.gamedata.get(DbCollectionItemNameGameDataComboCount),
-			db.gamedata.get(DbCollectionItemNameGameDataMaxCombo),
-			db.gamedata.get(DbCollectionItemNameGameDataFastestScore),
-		]);
-
-		if (!(scoreData && scoreValueData && lastMatchData && comboData && maxComboData && fastestScoreData)) {
+	return db.transaction('rw', db.gamedata, db.gamerun, async () => {
+		if (!(await isRunMutable())) {
 			return null;
 		}
 
-		const isCombo = isComboEligible(currentTime, lastMatchData.value);
-		const newComboCount = isCombo ? comboData.value + 1 : 0;
-		const newMaxCombo = Math.max(maxComboData.value, newComboCount);
-		const currentScoreValue = scoreValueData.value;
-		const newScore = scoreData.value + currentScoreValue;
-		const newScoreValue = calculateScoreValueWithCombo(
-			currentScoreValue,
-			newComboCount
-		);
-
-		const scoreDelta = currentTime - lastMatchData.value;
-		const currentFastest = fastestScoreData.value;
-		const newFastestScore = currentFastest === 0
-			? scoreDelta
-			: Math.min(currentFastest, scoreDelta);
-
-		const writes: Promise<unknown>[] = [
-			db.gamedata.update(DbCollectionItemNameGameDataScore, { value: newScore }),
-			db.gamedata.update(DbCollectionItemNameGameDataScoreValue, { value: newScoreValue }),
-			db.gamedata.update(DbCollectionItemNameGameDataLastMatchTime, { value: currentTime }),
-			db.gamedata.update(DbCollectionItemNameGameDataComboCount, { value: newComboCount }),
-			db.gamedata.update(DbCollectionItemNameGameDataMaxCombo, { value: newMaxCombo }),
-			db.gamedata.update(DbCollectionItemNameGameDataFastestScore, { value: newFastestScore }),
-		];
-
-		await Promise.all(writes);
-
-		return { pointsAwarded: currentScoreValue, comboCount: newComboCount, maxCombo: newMaxCombo };
+		return applyMatchPayout(currentTime);
 	});
+}
+
+async function applyMatchPayout(currentTime: number) {
+	const [scoreData, scoreValueData, lastMatchData, comboData, maxComboData, fastestScoreData] = await Promise.all([
+		db.gamedata.get(DbCollectionItemNameGameDataScore),
+		db.gamedata.get(DbCollectionItemNameGameDataScoreValue),
+		db.gamedata.get(DbCollectionItemNameGameDataLastMatchTime),
+		db.gamedata.get(DbCollectionItemNameGameDataComboCount),
+		db.gamedata.get(DbCollectionItemNameGameDataMaxCombo),
+		db.gamedata.get(DbCollectionItemNameGameDataFastestScore),
+	]);
+
+	if (!(scoreData && scoreValueData && lastMatchData && comboData && maxComboData && fastestScoreData)) {
+		return null;
+	}
+
+	const isCombo = isComboEligible(currentTime, lastMatchData.value);
+	const newComboCount = isCombo ? comboData.value + 1 : 0;
+	const newMaxCombo = Math.max(maxComboData.value, newComboCount);
+	const currentScoreValue = scoreValueData.value;
+	const newScore = scoreData.value + currentScoreValue;
+	const newScoreValue = calculateScoreValueWithCombo(
+		currentScoreValue,
+		newComboCount
+	);
+
+	const scoreDelta = currentTime - lastMatchData.value;
+	const currentFastest = fastestScoreData.value;
+	const newFastestScore = currentFastest === 0
+		? scoreDelta
+		: Math.min(currentFastest, scoreDelta);
+
+	await Promise.all([
+		db.gamedata.update(DbCollectionItemNameGameDataScore, { value: newScore }),
+		db.gamedata.update(DbCollectionItemNameGameDataScoreValue, { value: newScoreValue }),
+		db.gamedata.update(DbCollectionItemNameGameDataLastMatchTime, { value: currentTime }),
+		db.gamedata.update(DbCollectionItemNameGameDataComboCount, { value: newComboCount }),
+		db.gamedata.update(DbCollectionItemNameGameDataMaxCombo, { value: newMaxCombo }),
+		db.gamedata.update(DbCollectionItemNameGameDataFastestScore, { value: newFastestScore }),
+	]);
+
+	return { pointsAwarded: currentScoreValue, comboCount: newComboCount, maxCombo: newMaxCombo };
 }
 
 export
 async function penalizeInvalidSet() {
-	return db.transaction('rw', db.gamedata, async () => {
+	return db.transaction('rw', db.gamedata, db.gamerun, async () => {
+		if (!(await isRunMutable())) {
+			return null;
+		}
+
 		const [scoreValueData, missesData] = await Promise.all([
 			db.gamedata.get(DbCollectionItemNameGameDataScoreValue),
 			db.gamedata.get(DbCollectionItemNameGameDataMisses),
@@ -498,7 +574,11 @@ async function penalizeInvalidSet() {
 
 export
 async function penalizeUnnecessaryShuffle() {
-	return db.transaction('rw', db.gamedata, async () => {
+	return db.transaction('rw', db.gamedata, db.gamerun, async () => {
+		if (!(await isRunMutable())) {
+			return null;
+		}
+
 		const [scoreValueData, missesData] = await Promise.all([
 			db.gamedata.get(DbCollectionItemNameGameDataScoreValue),
 			db.gamedata.get(DbCollectionItemNameGameDataMisses),
@@ -521,20 +601,30 @@ async function penalizeUnnecessaryShuffle() {
 
 export
 async function shuffleDeck() {
-	const deck = await db.setorders.get(DbCollectionItemNameSetOrdersDeck);
+	return db.transaction('rw', db.setorders, db.gamerun, async () => {
+		if (!(await isRunMutable())) {
+			return;
+		}
 
-	if (!deck) {
-		return;
-	}
+		const deck = await db.setorders.get(DbCollectionItemNameSetOrdersDeck);
 
-	await db.setorders.update(DbCollectionItemNameSetOrdersDeck, {
-		order: randomizeArray(deck.order),
+		if (!deck) {
+			return;
+		}
+
+		await db.setorders.update(DbCollectionItemNameSetOrdersDeck, {
+			order: randomizeArray(deck.order),
+		});
 	});
 }
 
 export
 async function discardCards(discardCardIds: string[], boardSize: number) {
-	await db.transaction('rw', db.setorders, async () => {
+	await db.transaction('rw', db.setorders, db.gamerun, async () => {
+		if (!(await isRunMutable())) {
+			return;
+		}
+
 		const deckOrder = await db.setorders.get(DbCollectionItemNameSetOrdersDeck);
 		const discardPile = await db.setorders.get(DbCollectionItemNameSetOrdersDiscard);
 
@@ -599,7 +689,117 @@ async function getGameCompletionData(): Promise<GameCompletionData> {
 }
 
 export
-async function recordGameCompletion(remainingCards: number): Promise<GameHistoryEntry> {
+interface RecordedCompletion {
+	readonly entry: GameHistoryEntry;
+	readonly isNew: boolean;
+}
+
+export
+async function recordGameCompletion(remainingCards: number): Promise<RecordedCompletion> {
+	return db.transaction(
+		'rw',
+		db.gamedata,
+		db.setorders,
+		db.gamehistory,
+		db.gamerun,
+		async () => persistCompletion(remainingCards),
+	);
+}
+
+export
+async function completeNoSetsRun(
+	currentTime: number,
+	remainingCards: number,
+): Promise<RecordedCompletion & {
+	readonly payout: Awaited<ReturnType<typeof applyMatchPayout>>;
+}> {
+	return db.transaction('rw', db.gamedata, db.setorders, db.gamehistory, db.gamerun, async () => {
+		if (!(await isRunMutable())) {
+			const recorded = await persistCompletion(remainingCards);
+			return { ...recorded, payout: null };
+		}
+
+		const payout = await applyMatchPayout(currentTime);
+		const recorded = await persistCompletion(remainingCards);
+		return { ...recorded, payout };
+	});
+}
+
+export
+async function submitRunScore(
+	submit: (data: GameCompletionData) => Promise<boolean>,
+): Promise<boolean> {
+	const run = await getCurrentRun();
+	if (!shouldSubmitScore(run)) {
+		return run.scoreSubmitted;
+	}
+
+	try {
+		const success = await submit(await getGameCompletionData());
+		if (!success) {
+			return false;
+		}
+	} catch {
+		return false;
+	}
+
+	const latest = await getCurrentRun();
+	await db.gamerun.put(toRunRecord(markScoreSubmitted(latest)));
+	return true;
+}
+
+export
+async function getCurrentRun(): Promise<GameRunState> {
+	const record = await db.gamerun.get(DbCollectionItemNameGameRun);
+	if (record) {
+		return fromRunRecord(record);
+	}
+
+	const deck = await db.setorders.get(DbCollectionItemNameSetOrdersDeck);
+	const run = migrateLegacyRun(deck?.order.length ?? 1);
+	await db.gamerun.put(toRunRecord(run));
+	return run;
+}
+
+async function isRunMutable() {
+	return canMutateGameplay(await getCurrentRun());
+}
+
+async function persistCompletion(remainingCards: number): Promise<RecordedCompletion> {
+	const run = await getCurrentRun();
+	const existing = await loadExistingHistory(run);
+	if (existing) {
+		if (shouldRecordHistory(run)) {
+			await db.gamerun.put(toRunRecord(applyCompletion(run, existing.id)));
+		}
+		return { entry: existing, isNew: false };
+	}
+
+	if (!shouldRecordHistory(run)) {
+		return {
+			entry: await buildHistoryEntry(run.runId, remainingCards),
+			isNew: false,
+		};
+	}
+
+	const entry = await buildHistoryEntry(run.runId, remainingCards);
+	await db.gamehistory.add(entry);
+	await db.gamerun.put(toRunRecord(applyCompletion(run, entry.id)));
+	return { entry, isNew: true };
+}
+
+async function loadExistingHistory(run: GameRunState) {
+	if (run.historyEntryId) {
+		const linked = await db.gamehistory.get(run.historyEntryId);
+		if (linked) {
+			return linked;
+		}
+	}
+
+	return db.gamehistory.get(run.runId);
+}
+
+async function buildHistoryEntry(id: string, remainingCards: number): Promise<GameHistoryEntry> {
 	const [scoreData, timeData, maxComboData, missesData, fastestScoreData, discardPile] = await Promise.all([
 		db.gamedata.get(DbCollectionItemNameGameDataScore),
 		db.gamedata.get(DbCollectionItemNameGameDataTime),
@@ -609,8 +809,8 @@ async function recordGameCompletion(remainingCards: number): Promise<GameHistory
 		db.setorders.get(DbCollectionItemNameSetOrdersDiscard),
 	]);
 
-	const entry: GameHistoryEntry = {
-		id: crypto.randomUUID(),
+	return {
+		id,
 		completedAt: Date.now(),
 		score: scoreData?.value ?? 0,
 		time: timeData?.value ?? 0,
@@ -620,10 +820,6 @@ async function recordGameCompletion(remainingCards: number): Promise<GameHistory
 		misses: missesData?.value ?? 0,
 		fastestScore: fastestScoreData?.value ?? 0,
 	};
-
-	await db.gamehistory.add(entry);
-
-	return entry;
 }
 
 export

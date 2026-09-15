@@ -9,6 +9,7 @@
 		"dev:electron": "cross-env BUILD_TARGET=electron vite",
 		"preview": "vite preview",
 		"typecheck": "tsc --noEmit && tsc -p electron/tsconfig.json",
+		"test": "bun test src",
 		"build": "tsc --noEmit && vite build",
 		"build:electron": "tsc -p electron/tsconfig.json && cross-env BUILD_TARGET=electron vite build",
 		"package:electron:linux": "electron-builder --linux --config electron-builder.config.ts",
