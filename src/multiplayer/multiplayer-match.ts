@@ -1,3 +1,4 @@
+// In-memory local-match state. Do not import persistence APIs from core.ts.
 import { BoardCardCount } from '@/constants';
 import {
 	CanonicalDeckSize,
