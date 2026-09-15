@@ -1,15 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Box, Container, Typography } from '@mui/material';
 import { Card, ScorePopup, createScorePopup } from '@/types';
-import {
-	isSet,
-	setExists,
-	shuffleDeck,
-	discardCards,
-} from '@/core';
+import { isSet, setExists } from '@/core';
 import { BoardCardCount } from '@/constants';
 import { useIsPaused, useSetIsPaused } from '@/atoms';
-import { useDeck, useDeckOrder } from '@/game-queries';
 import { getGamepadManager } from '@/input/gamepad-manager';
 import { getKeyboardManager } from '@/input/keyboard-manager';
 import { InputAction, InputActionToDirection } from '@/input/input-types';
@@ -17,6 +11,15 @@ import type { InputEvent } from '@/input/input-types';
 import { useNavigatePlayer, useSelectPlayerCurrent, useInitializePlayerFocus } from '@/focus/multiplayer-focus-atoms';
 import { useSoundEffects } from '@/hooks';
 import type { Player, PlayerId } from '@/multiplayer/multiplayer-types';
+import {
+	callNoSets,
+	clearPlayerSelection,
+	commitDiscard,
+	createMultiplayerSession,
+	rematchSession,
+	selectCard,
+	type MultiplayerSession,
+} from '@/multiplayer/multiplayer-match';
 import MultiplayerCardArea from './multiplayer-card-area';
 import MultiplayerScoreboard from './multiplayer-scoreboard';
 import MultiplayerButtonPrompts from './multiplayer-button-prompts';
@@ -36,8 +39,6 @@ interface MultiplayerPlayAreaProps {
 }
 
 export default function MultiplayerPlayArea({ players, onQuit }: MultiplayerPlayAreaProps) {
-	const deck = useDeck();
-	const deckOrder = useDeckOrder();
 	const soundEffects = useSoundEffects();
 	const navigatePlayer = useNavigatePlayer();
 	const selectPlayerCurrent = useSelectPlayerCurrent();
@@ -47,45 +48,52 @@ export default function MultiplayerPlayArea({ players, onQuit }: MultiplayerPlay
 	const pausedRef = useRef(paused);
 	pausedRef.current = paused;
 
-	const [scores, setScores] = useState<ReadonlyMap<PlayerId, number>>(() => {
-		const initial = new Map<PlayerId, number>();
-		players.forEach(p => initial.set(p.id, 0));
-		return initial;
-	});
-	const [selections, setSelections] = useState<ReadonlyMap<PlayerId, readonly string[]>>(new Map());
-	const [discardingCards, setDiscardingCards] = useState<readonly string[]>([]);
-	const [gameOver, setGameOver] = useState(false);
+	const [session, setSession] = useState(() => createMultiplayerSession(players.map(player => player.id)));
+	const sessionRef = useRef(session);
+	sessionRef.current = session;
+	const gameOverRef = useRef(session.gameOver);
+	gameOverRef.current = session.gameOver;
+
 	const [focusInitialized, setFocusInitialized] = useState(false);
 	const [scorePopups, setScorePopups] = useState<ScorePopup[]>([]);
-
-	// Track pending timeouts for cleanup
 	const pendingTimeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
 
-	const dealtCards = deck.slice(0, BoardCardCount);
+	const dealtCards = useMemo(
+		() => parseDealtCards(session.board.deck),
+		[session.board.deck],
+	);
 
-	// Build sourceIndex -> PlayerId mapping
 	const sourceToPlayer = useMemo(() => {
 		const map = new Map<string, Player>();
-		players.forEach(p => map.set(String(p.sourceIndex), p));
+		players.forEach(player => map.set(String(player.sourceIndex), player));
 		return map;
 	}, [players]);
 
-	// Initialize focus for all players once cards are available
 	useEffect(() => {
 		if (dealtCards.length > 0 && !focusInitialized) {
-			const playerIds = players.map(p => p.id);
-			initializePlayerFocus(playerIds);
+			initializePlayerFocus(players.map(player => player.id));
 			setFocusInitialized(true);
 		}
 	}, [dealtCards.length, focusInitialized, players, initializePlayerFocus]);
 
-	// Cleanup all pending timeouts on unmount
 	useEffect(() => {
 		const timeouts = pendingTimeoutsRef.current;
 		return () => {
 			timeouts.forEach(clearTimeout);
 		};
 	}, []);
+
+	useEffect(() => {
+		if (session.gameOver) {
+			setPaused(false);
+		}
+	}, [session.gameOver, setPaused]);
+
+	function applySession(next: MultiplayerSession) {
+		sessionRef.current = next;
+		gameOverRef.current = next.gameOver;
+		setSession(next);
+	}
 
 	function trackTimeout(fn: () => void, ms: number) {
 		const id = setTimeout(() => {
@@ -95,133 +103,81 @@ export default function MultiplayerPlayArea({ players, onQuit }: MultiplayerPlay
 		pendingTimeoutsRef.current.add(id);
 	}
 
-	function scoreAndNotify(playerId: PlayerId, delta: number) {
-		setScores(s => {
-			const newScores = new Map(s);
-			newScores.set(playerId, (newScores.get(playerId) ?? 0) + delta);
-			return newScores;
-		});
-
-		const player = players.find(p => p.id === playerId);
+	function notifyScore(playerId: PlayerId, delta: number) {
+		const player = players.find(item => item.id === playerId);
 		const variant: 'reward' | 'penalty' = delta > 0 ? 'reward' : 'penalty';
 		setScorePopups(prev => [...prev, createScorePopup(variant, Math.abs(delta), 0, player?.color)]);
 	}
 
 	const removeScorePopup = useCallback((id: string) => {
-		setScorePopups(prev => prev.filter(p => p.id !== id));
+		setScorePopups(prev => prev.filter(popup => popup.id !== id));
 	}, []);
 
 	const handleCardSelected = useCallback((cardId: string, playerId: PlayerId) => {
-		if (discardingCards.includes(cardId)) return;
+		const current = sessionRef.current;
+		const result = selectCard(
+			current,
+			playerId,
+			cardId,
+			ids => selectionIsSet(ids, parseDealtCards(current.board.deck)),
+		);
 
-		setSelections(prev => {
-			const playerCards = [...(prev.get(playerId) ?? [])];
-			const cardIndex = playerCards.indexOf(cardId);
+		if (result.kind === 'noop') {
+			return;
+		}
 
-			if (cardIndex >= 0) {
-				const updated = new Map(prev);
-				updated.set(playerId, playerCards.filter(id => id !== cardId));
-				return updated;
-			}
+		applySession(result.session);
 
-			if (playerCards.length >= 3) return prev;
-
-			const newSelection = [...playerCards, cardId];
-
-			if (newSelection.length !== 3) {
-				const updated = new Map(prev);
-				updated.set(playerId, newSelection);
-				return updated;
-			}
-
-			// 3 cards selected — validate
-			const selectedCards = newSelection
-				.map(id => dealtCards.find(c => c.id === id))
-				.filter((c): c is Card => !!c);
-
-			if (selectedCards.length !== 3) {
-				const updated = new Map(prev);
-				updated.set(playerId, []);
-				return updated;
-			}
-
-			const [cardA, cardB, cardC] = selectedCards as [Card, Card, Card];
-
-			if (isSet(cardA, cardB, cardC)) {
-				const updated = new Map(prev);
-				updated.set(playerId, []);
-
-				// Clear other players' selections of these cards
-				for (const [pid, pCards] of updated) {
-					if (pid !== playerId) {
-						const filtered = pCards.filter(id => !newSelection.includes(id));
-						if (filtered.length !== pCards.length) {
-							updated.set(pid, filtered);
-						}
-					}
-				}
-
-				scoreAndNotify(playerId, 1);
-				setDiscardingCards(prev => [...prev, ...newSelection]);
-				soundEffects('success');
-
-				trackTimeout(() => {
-					discardCards([...newSelection], BoardCardCount);
-					setDiscardingCards(prev => prev.filter(id => !newSelection.includes(id)));
-				}, 1100);
-
-				return updated;
-			}
-
-			// Invalid set — penalize
-			scoreAndNotify(playerId, -1);
-
+		if (result.kind === 'valid-set') {
+			notifyScore(playerId, 1);
+			soundEffects('success');
+			const generation = result.session.board.generation;
 			trackTimeout(() => {
-				setSelections(prev => {
-					const updated = new Map(prev);
-					updated.set(playerId, []);
-					return updated;
-				});
-			}, 800);
+				applySession(commitDiscard(sessionRef.current, result.cardIds, generation));
+			}, 1100);
+			return;
+		}
 
-			const updated = new Map(prev);
-			updated.set(playerId, newSelection);
-			return updated;
-		});
-	}, [dealtCards, discardingCards, soundEffects]);
+		if (result.kind === 'invalid-set') {
+			notifyScore(playerId, -1);
+			const generation = result.session.board.generation;
+			trackTimeout(() => {
+				applySession(clearPlayerSelection(sessionRef.current, playerId, generation));
+			}, 800);
+		}
+	}, [players, soundEffects]);
 
 	const handleCardSelectedRef = useRef(handleCardSelected);
 	handleCardSelectedRef.current = handleCardSelected;
 
 	const handleNoSetCall = useCallback((playerId: PlayerId) => {
-		const hasSet = setExists(dealtCards);
-		const deckExhausted = (deckOrder?.order.length ?? 0) <= BoardCardCount;
+		const current = sessionRef.current;
+		const result = callNoSets(
+			current,
+			playerId,
+			setExists(parseDealtCards(current.board.deck)),
+		);
 
-		if (hasSet) {
-			scoreAndNotify(playerId, -1);
+		if (result.kind === 'noop') {
 			return;
 		}
 
-		scoreAndNotify(playerId, 1);
-
-		if (deckExhausted) {
-			setGameOver(true);
-			return;
-		}
-
-		setSelections(new Map());
-		shuffleDeck();
-	}, [dealtCards, deckOrder]);
+		applySession(result.session);
+		notifyScore(playerId, result.kind === 'penalty' ? -1 : 1);
+	}, [players]);
 
 	const handleNoSetCallRef = useRef(handleNoSetCall);
 	handleNoSetCallRef.current = handleNoSetCall;
 
-	// Input handling
 	useEffect(() => {
 		const gamepadManager = getGamepadManager();
 		const keyboardManager = getKeyboardManager();
 
 		function handleInput(event: InputEvent) {
+			if (gameOverRef.current) {
+				return;
+			}
+
 			if (event.action === InputAction.PAUSE) {
 				setPaused(!pausedRef.current);
 				return;
@@ -246,7 +202,6 @@ export default function MultiplayerPlayArea({ players, onQuit }: MultiplayerPlay
 
 			if (event.action === InputAction.SHUFFLE) {
 				handleNoSetCallRef.current(player.id);
-				return;
 			}
 		}
 
@@ -261,31 +216,20 @@ export default function MultiplayerPlayArea({ players, onQuit }: MultiplayerPlay
 		};
 	}, [sourceToPlayer, navigatePlayer, selectPlayerCurrent, setPaused]);
 
-	// Auto-end when board is cleared
-	useEffect(() => {
-		if (deck.length === 0 && focusInitialized) {
-			setGameOver(true);
-		}
-	}, [deck.length, focusInitialized]);
-
 	const handleRematch = useCallback(() => {
-		setScores(() => {
-			const initial = new Map<PlayerId, number>();
-			players.forEach(p => initial.set(p.id, 0));
-			return initial;
-		});
-		setSelections(new Map());
-		setDiscardingCards([]);
-		setGameOver(false);
+		pendingTimeoutsRef.current.forEach(clearTimeout);
+		pendingTimeoutsRef.current.clear();
+		setPaused(false);
 		setFocusInitialized(false);
 		setScorePopups([]);
-	}, [players]);
+		applySession(rematchSession(sessionRef.current));
+	}, [setPaused]);
 
-	if (gameOver) {
+	if (session.gameOver) {
 		return (
 			<MultiplayerResults
 				players={players}
-				scores={scores}
+				scores={session.scores}
 				onRematch={handleRematch}
 				onQuit={onQuit}
 			/>
@@ -304,7 +248,7 @@ export default function MultiplayerPlayArea({ players, onQuit }: MultiplayerPlay
 				flexDirection: { xs: 'column', sm: 'row' },
 			}}
 		>
-			<MultiplayerScoreboard players={players} scores={scores} />
+			<MultiplayerScoreboard players={players} scores={session.scores} />
 			<Box
 				sx={{
 					position: 'relative',
@@ -317,11 +261,12 @@ export default function MultiplayerPlayArea({ players, onQuit }: MultiplayerPlay
 				}}
 			>
 				<MultiplayerCardArea
+					key={session.board.generation}
 					cards={dealtCards}
 					players={players}
-					selections={selections}
-					discardingCardIds={discardingCards}
-					onCardSelected={(cardId, playerId) => handleCardSelectedRef.current(cardId, playerId as PlayerId)}
+					selections={session.selections}
+					discardingCardIds={session.discardingCardIds}
+					onCardSelected={(cardId, playerId) => handleCardSelectedRef.current(cardId, playerId)}
 				/>
 				<GameScorePopups popups={scorePopups} onComplete={removeScorePopup} />
 			</Box>
@@ -338,14 +283,35 @@ export default function MultiplayerPlayArea({ players, onQuit }: MultiplayerPlay
 				}}
 			>
 				<Typography variant="h5">
-					{deck.length} cards left
+					{session.board.deck.length} cards left
 				</Typography>
 				<MultiplayerButtonPrompts
-					controllerTypes={players.map(p => p.controllerType)}
+					controllerTypes={players.map(player => player.controllerType)}
 					actions={GAME_ACTIONS}
 				/>
 			</Box>
 			<MultiplayerPauseDialog onQuit={onQuit} />
 		</Container>
 	);
+}
+
+function parseDealtCards(deck: readonly string[]): Card[] {
+	return deck.slice(0, BoardCardCount).map(id => ({ id, ...JSON.parse(id) }));
+}
+
+function selectionIsSet(cardIds: readonly [string, string, string], dealt: readonly Card[]): boolean {
+	const cards = cardIds
+		.map(id => dealt.find(card => card.id === id))
+		.filter((card): card is Card => !!card);
+
+	if (cards.length !== 3) {
+		return false;
+	}
+
+	const [a, b, c] = cards;
+	if (!a || !b || !c) {
+		return false;
+	}
+
+	return isSet(a, b, c);
 }

@@ -1,5 +1,5 @@
-import { moveAndOverwriteItem, randomizeArray } from './utils';
 import Dexie, { EntityTable } from 'dexie';
+import { applyDiscard, generateDeck, shuffleOrder } from './deck';
 import {
 	DbCollectionItemNameGameDataMisses,
 	DbCollectionItemNameGameDataFastestScore,
@@ -53,12 +53,10 @@ interface GameHistoryEntry {
 import {
 	BitwiseValue,
 	Card,
-	Colors,
-	Counts,
-	Fills,
 	SetOrders,
-	Shapes,
 } from './types';
+
+export { generateCanonicalDeck, generateDeck } from './deck';
 
 export
 function setExists(cards: Card[]) {
@@ -613,7 +611,7 @@ async function shuffleDeck() {
 		}
 
 		await db.setorders.update(DbCollectionItemNameSetOrdersDeck, {
-			order: randomizeArray(deck.order),
+			order: shuffleOrder(deck.order),
 		});
 	});
 }
@@ -632,43 +630,17 @@ async function discardCards(discardCardIds: string[], boardSize: number) {
 			return;
 		}
 
-		const selectedIndexes = discardCardIds.map(selectedId => deckOrder.order.indexOf(selectedId)) as [number, number, number];
+		const next = applyDiscard(deckOrder.order, discardPile.order, discardCardIds, boardSize);
 
 		await Promise.all([
 			db.setorders.update(DbCollectionItemNameSetOrdersDeck, {
-				order: deckOrder.order.length > boardSize ?
-					dealNewCards(deckOrder.order, selectedIndexes, boardSize):
-					deckOrder.order.filter(id => !discardCardIds.includes(id)),
+				order: [...next.deck],
 			}),
 			db.setorders.update(DbCollectionItemNameSetOrdersDiscard, {
-				order: [...discardPile.order, ...discardCardIds]
+				order: [...next.discard],
 			}),
 		]);
 	});
-}
-
-function dealNewCards(cardOrderIds: string[], removeCardIndexes: [number, number, number], dealtCardCount: number) {
-	const afterFirst = moveAndOverwriteItem(cardOrderIds, dealtCardCount, removeCardIndexes[0]);
-	const afterSecond = moveAndOverwriteItem(afterFirst, dealtCardCount, removeCardIndexes[1]);
-	return moveAndOverwriteItem(afterSecond, dealtCardCount, removeCardIndexes[2]);
-}
-
-export
-function generateCanonicalDeck(): string[] {
-	return Object.values(Fills).flatMap(fill =>
-		Object.values(Colors).flatMap(color =>
-			Object.values(Shapes).flatMap(shape =>
-				Object.values(Counts).map(count =>
-					JSON.stringify({ fill, color, shape, count })
-				)
-			)
-		)
-	);
-}
-
-export
-function generateDeck() {
-	return randomizeArray(generateCanonicalDeck());
 }
 
 export

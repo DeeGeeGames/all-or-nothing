@@ -1,5 +1,5 @@
 import { type Card } from '@/types';
-import { generateCanonicalDeck } from '@/core';
+import { generateCanonicalDeck } from '@/deck';
 import { mulberry32, dateToSeed, seededShuffle } from './seeded-rng';
 
 // Generate the daily board for a given date
