@@ -1,3 +1,5 @@
+import { createUuid } from './uuid';
+
 export
 type Enum<T extends object> = T[keyof T];
 
@@ -118,7 +120,7 @@ function createScorePopup(
 	mismatchedAttributes?: string[],
 ): ScorePopup {
 	return {
-		id: crypto.randomUUID(),
+		id: createUuid(),
 		points,
 		comboCount,
 		variant,

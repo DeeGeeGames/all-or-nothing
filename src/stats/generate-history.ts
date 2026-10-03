@@ -1,4 +1,5 @@
 import type { GameHistoryEntry } from '@/core';
+import { createUuid } from '@/uuid';
 
 interface GenerateOptions {
 	readonly count?: number;
@@ -27,7 +28,7 @@ export function generateGameHistory({
 		const fastestScore = Math.max(1, 15 - trendMultiplier * 10 + jitter(3));
 
 		return {
-			id: crypto.randomUUID(),
+			id: createUuid(),
 			completedAt: Math.floor(startDate + i * interval),
 			score: Math.max(0, Math.round(baseScore)),
 			time: Math.max(30, Math.round(baseTime)),

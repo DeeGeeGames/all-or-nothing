@@ -1,3 +1,5 @@
+import { createUuid } from './uuid';
+
 export const CurrentGameRunId = 'current' as const;
 
 export
@@ -129,5 +131,5 @@ function fromRunRecord(record: GameRunRecord): GameRunState {
 }
 
 function createRunId() {
-	return crypto.randomUUID();
+	return createUuid();
 }
