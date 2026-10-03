@@ -2,6 +2,110 @@ body {
 	background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%);
 }
 
+.title-screen {
+	height: 100svh;
+	display: flex !important;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	gap: 32px;
+	padding: max(24px, env(safe-area-inset-top)) 24px 84px !important;
+	overflow-y: auto;
+}
+
+.title-screen-layout {
+	width: 100%;
+	gap: 64px;
+	flex-shrink: 0;
+}
+
+.title-identity { display: flex; flex-direction: column; gap: 36px; }
+.title-menu { width: min(300px, 100%) !important; }
+.title-menu .MuiButton-root { min-height: 44px; }
+.steam-promotion {
+	box-sizing: border-box;
+	display: grid;
+	grid-template-columns: 100px minmax(0, 1fr) 44px;
+	align-items: center;
+	gap: 18px;
+	width: min(650px, 100%);
+	flex-shrink: 0;
+	padding: 16px;
+	border-radius: 10px;
+	background: rgba(248, 249, 251, .94);
+	text-align: left;
+}
+.steam-promotion-art { width: 100%; border-radius: 6px; }
+.steam-promotion-copy { min-width: 0; }
+.promotion-caption.MuiTypography-root { font-size: 10px; font-weight: 700; letter-spacing: 1.1px; color: #60656b; }
+.steam-promotion-title.MuiTypography-root { font-size: 19px; font-weight: 500; margin-top: 4px; }
+.steam-promotion-description.MuiTypography-root { font-size: 13px; color: #60656b; margin-top: 4px; }
+.steam-promotion > :nth-child(3) { align-self: start; }
+
+.game-shelf-screen {
+	height: 100svh;
+	overflow-y: auto;
+	padding: max(28px, env(safe-area-inset-top)) 6vw max(40px, env(safe-area-inset-bottom)) !important;
+}
+.game-shelf-heading { text-align: center; margin: 36px 0 32px; }
+.game-shelf-heading h1 { font-size: 40px; font-weight: 300; margin: 10px 0; }
+.game-shelf-heading > :last-child { color: #60656b; }
+.game-shelf-grid { display: flex; justify-content: center; align-items: stretch; flex-wrap: wrap; gap: 28px; }
+.game-shelf-card { width: min(380px, 100%); border-radius: 12px; background: #f8f9fb; overflow: hidden; }
+.game-shelf-art { width: 100%; aspect-ratio: 1.9; object-fit: cover; display: block; }
+.game-shelf-copy { padding: 24px; }
+.game-shelf-card-title.MuiTypography-root { font-size: 26px; font-weight: 500; margin: 10px 0; }
+.game-shelf-description.MuiTypography-root { color: #60656b; line-height: 1.5; }
+.game-shelf-footer { display: flex; justify-content: center; margin-top: 36px; }
+
+@media (max-width: 699px) {
+	.title-screen { gap: 24px; padding: max(20px, env(safe-area-inset-top)) 20px 76px !important; }
+	.title-screen-layout { display: flex; flex-direction: column; align-items: center; gap: 28px; }
+	.title-identity { gap: 22px; }
+	.steam-promotion { grid-template-columns: 58px minmax(0, 1fr) 44px; gap: 10px; padding: 12px; }
+	.steam-promotion-title.MuiTypography-root { font-size: 17px; }
+	.steam-promotion-description { display: none; }
+	.promotion-caption.MuiTypography-root { font-size: 8px; letter-spacing: .7px; }
+	.game-shelf-screen { padding-left: 20px !important; padding-right: 20px !important; }
+	.game-shelf-heading { margin-top: 24px; text-align: left; }
+	.game-shelf-heading h1 { font-size: 32px; }
+}
+@media (max-height: 640px) {
+	.title-screen { gap: 16px; justify-content: safe center; padding-top: 16px !important; padding-bottom: 68px !important; }
+	.title-screen-layout { gap: 16px; }
+	.title-identity { gap: 14px; }
+	.steam-promotion { padding: 10px; }
+}
+@media (max-width: 699px) and (max-height: 600px) {
+	.title-screen { gap: 12px; padding-top: 12px !important; }
+	.title-screen-layout { gap: 12px; }
+	.title-identity { gap: 10px; }
+	.title-identity h1 { font-size: 32px; }
+	.title-menu-buttons { gap: 8px !important; }
+}
+@media (min-width: 700px) and (max-height: 540px) {
+	.title-screen { padding-bottom: 60px !important; }
+	.steam-promotion { grid-template-columns: 60px minmax(0, 1fr) 44px; padding: 8px 14px; }
+	.steam-promotion-description { display: none; }
+	.steam-promotion-title.MuiTypography-root { font-size: 16px; }
+	.title-screen-layout .MuiButton-root { min-height: 40px; }
+	.title-menu-buttons { gap: 8px !important; }
+}
+@media (min-width: 1400px) and (min-height: 850px) {
+	.title-menu { width: 420px !important; }
+	.title-menu .MuiButton-root { font-size: 22px; min-height: 60px; }
+	.title-identity h1 { font-size: 56px; }
+	.title-screen-layout { gap: 80px; }
+	.game-shelf-heading h1 { font-size: 56px; }
+	.game-shelf-heading > :last-child { font-size: 24px; }
+	.game-shelf-card { width: 500px; }
+	.game-shelf-card-title.MuiTypography-root { font-size: 34px; }
+	.game-shelf-description.MuiTypography-root { font-size: 24px; }
+	.game-shelf-copy .MuiButton-root, .game-shelf-header .MuiButton-root { font-size: 24px; min-height: 60px; }
+	.game-shelf-copy { padding: 28px; }
+	.game-shelf-copy .promotion-caption { font-size: 14px; }
+}
+
 html,
 body,
 #app {

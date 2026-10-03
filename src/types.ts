@@ -29,6 +29,7 @@ const Screens = {
 	Daily: 'daily',
 	Stats: 'stats',
 	Achievements: 'achievements',
+	MoreGames: 'more-games',
 } as const;
 
 export

@@ -82,6 +82,11 @@ jobs:
         with:
           name: ${{ matrix.release_artifact_name }}
           path: ${{ matrix.release_artifact_glob }}
+      - name: Mark unpacked build as Steam distribution
+        run: node -e "require('node:fs').writeFileSync(require('node:path').join(process.env.STEAM_BUILD_PATH, 'steam_appid.txt'), process.env.STEAM_APP_ID)"
+        env:
+          STEAM_BUILD_PATH: ${{ matrix.steam_artifact_path }}
+          STEAM_APP_ID: ${{ secrets.STEAM_APP_ID }}
       - name: Upload unpacked build for Steam
         uses: actions/upload-artifact@v7
         with:

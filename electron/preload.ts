@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
 	platform: 'electron' as const,
+	getDistribution: (): Promise<'standalone' | 'steam'> => ipcRenderer.invoke('app:getDistribution'),
+	openGameStore: (id: string, inBrowser = false): Promise<boolean> => ipcRenderer.invoke('app:openGameStore', id, inBrowser),
 	quit: (): void => { ipcRenderer.send('app:quit'); },
 	setFullscreen: (enabled: boolean): void => { ipcRenderer.send('app:setFullscreen', enabled); },
 	isFullscreen: (): Promise<boolean> => ipcRenderer.invoke('app:isFullscreen'),

@@ -38,6 +38,7 @@ const Daily = lazy(() => import('./components/screens/daily-screen'));
 const Stats = lazy(() => import('./components/screens/stats-screen'));
 const Achievements = lazy(() => import('./components/screens/achievements-screen'));
 const SplashSequence = lazy(() => import('./components/screens/splash-sequence'));
+const MoreGames = lazy(() => import('./components/screens/more-games-screen'));
 
 const ScreenComponents = {
 	[Screens.Splash]: SplashSequence,
@@ -52,6 +53,7 @@ const ScreenComponents = {
 	[Screens.Daily]: Daily,
 	[Screens.Stats]: Stats,
 	[Screens.Achievements]: Achievements,
+	[Screens.MoreGames]: MoreGames,
 } as const;
 
 export default

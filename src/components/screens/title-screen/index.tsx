@@ -32,6 +32,8 @@ import FullscreenFab from '@/components/fullscreen-fab';
 import { ButtonPromptsBar } from '@/components/button-prompts';
 import MenuButtons, { MENU_ANIM_DURATION_MS } from './menu-buttons';
 import { MenuId, subMenuOpenerIds, type MenuHandlers } from './menu-definitions';
+import SteamPromotion from '@/promotions/steam-promotion';
+import { useTitleMenu } from '@/promotions/state';
 
 // --- Title text animation constants ---
 
@@ -190,13 +192,16 @@ export default function Landing() {
 	const [dailyStreak] = useState(getCurrentStreak);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const confettiTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-	const useSideLayout = useMediaQuery('(max-height: 800px) and (min-width: 700px)');
+	const useSideLayout = useMediaQuery('(min-width: 700px)');
+	const useCompactCards = useMediaQuery('(max-width: 699px), (max-height: 540px)');
+	const useLargeCards = useMediaQuery('(min-width: 1400px) and (min-height: 850px)');
+	const useSmallCards = useMediaQuery('(max-width: 699px) and (max-height: 600px)');
 	const [menuAnimDone, setMenuAnimDone] = useState(
 		() => !!prefersReducedMotion || splashComplete,
 	);
 	const [animKey, setAnimKey] = useState(0);
-	const [activeMenu, setActiveMenu] = useState<MenuId>(MenuId.Main);
-	const focusTargetRef = useRef<string | null>(null);
+	const [activeMenu, setActiveMenu] = useTitleMenu();
+	const focusTargetRef = useRef<string | null>(activeMenu === MenuId.Extra ? 'menu-more-games' : null);
 
 	// Set focus group based on animation state and whether the tutorial prompt is open.
 	// During animation, use a non-matching group so setActiveGroupAtom clears focus
@@ -321,6 +326,10 @@ export default function Landing() {
 		setActiveScreen(Screens.About);
 	}, [setActiveScreen]);
 
+	const handleMoreGames = useCallback(function () {
+		setActiveScreen(Screens.MoreGames);
+	}, [setActiveScreen]);
+
 	const handleQuit = useCallback(() => {
 		window.electronAPI?.quit();
 	}, []);
@@ -406,8 +415,7 @@ export default function Landing() {
 	const demoCardsSection = (
 		<Box
 			ref={containerRef}
-			paddingTop={useSideLayout ? 4 : 10}
-			height={200}
+			className="title-demo-cards"
 			display="flex"
 			justifyContent="center"
 			gap={2}
@@ -430,7 +438,7 @@ export default function Landing() {
 					animate={animate}
 				>
 					<PlayingCard
-						width={CARD_WIDTH}
+						width={useSmallCards ? 54 : useCompactCards ? 70 : useLargeCards ? 140 : CARD_WIDTH}
 						card={card}
 						raised={(isSelecting && index < selectedCount) || isMatched}
 						spin={isMatched}
@@ -443,7 +451,7 @@ export default function Landing() {
 	);
 
 	const titleSection = (
-		<Box paddingY={useSideLayout ? 3 : 7}>
+		<Box>
 			<motion.div
 				key={`title-${animKey}`}
 				variants={titleContainerVariants}
@@ -487,10 +495,11 @@ export default function Landing() {
 		handleTutorial,
 		handleAbout,
 		handleQuit,
+		handleMoreGames,
 	}), [
 		handleContinue, handleNewGame, handleDaily, handleMultiplayer,
 		handleLeaderboard, handleStats, handleAchievements,
-		handleHowToPlay, handleTutorial, handleAbout, handleQuit,
+		handleHowToPlay, handleTutorial, handleAbout, handleQuit, handleMoreGames,
 	]);
 
 	const menuDirection = activeMenu === MenuId.Main ? 'back' as const : 'forward' as const;
@@ -525,17 +534,16 @@ export default function Landing() {
 				minHeight: '100vh',
 			} : undefined}
 		>
-		<Container sx={{textAlign: 'center'}}>
+		<Container className="title-screen" sx={{textAlign: 'center'}}>
 			{useSideLayout ? (
 				<Box
 					display="flex"
 					alignItems="center"
 					justifyContent="center"
-					gap={6}
-					minHeight="100vh"
+					className="title-screen-layout"
 				>
 					<Box flex={1} display="flex" justifyContent="center">
-						<Box textAlign="center">
+						<Box textAlign="center" className="title-identity">
 							{demoCardsSection}
 							{titleSection}
 						</Box>
@@ -545,11 +553,16 @@ export default function Landing() {
 					</Box>
 				</Box>
 			) : (
-				<>
-					{demoCardsSection}
-					{titleSection}
+				<Box className="title-screen-layout">
+					<Box className="title-identity">
+						{demoCardsSection}
+						{titleSection}
+					</Box>
 					{buttonsSection}
-				</>
+				</Box>
+			)}
+			{activeMenu === MenuId.Main && !showFirstTimePrompt && (
+				<SteamPromotion enabled={menuAnimDone} />
 			)}
 			<Dialog open={showFirstTimePrompt} onClose={handlePromptSkip}>
 				<DialogTitle>Welcome!</DialogTitle>

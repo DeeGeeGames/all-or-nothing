@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>All or Nothing · Promotion concepts</title>
+	<style>
+		* { box-sizing: border-box; }
+		body { margin: 0; background: #f1f2f4; color: #262b32; font: 15px/1.5 system-ui, sans-serif; }
+		main { max-width: 1400px; margin: auto; padding: 36px 32px 48px; }
+		.eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 1.8px; color: #666d77; }
+		h1 { font-size: clamp(26px, 3vw, 38px); font-weight: 550; letter-spacing: -.9px; margin: 8px 0; }
+		.intro { color: #646b75; max-width: 780px; margin: 0 0 28px; }
+		.concepts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+		.concept { color: inherit; text-align: left; border: 1px solid #d5d9e0; border-radius: 10px; background: #fff; padding: 18px; font: inherit; cursor: pointer; }
+		.concept strong { display: block; font-size: 17px; margin: 5px 0; }
+		.concept small { color: #626b77; font-size: 13px; line-height: 1.5; display: block; }
+		.concept[aria-pressed="true"] { border-color: #1565c0; box-shadow: inset 0 0 0 1px #1565c0; background: #f7faff; }
+		.number { font-size: 10px; letter-spacing: 1px; font-weight: 700; color: #1565c0; }
+		.controls { display: flex; align-items: center; gap: 20px; margin: 24px 0 16px; flex-wrap: wrap; }
+		label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+		select, .open { border: 1px solid #c9cfd7; border-radius: 6px; min-height: 42px; padding: 8px 12px; background: #fff; color: #333c48; font: inherit; }
+		.open { text-decoration: none; font-size: 13px; margin-left: auto; display: inline-flex; align-items: center; }
+		.preview-wrap { background: #e1e4e9; border: 1px solid #cdd2da; border-radius: 12px; padding: 20px; }
+		.preview-meta { display: flex; justify-content: space-between; font-size: 12px; color: #606875; margin-bottom: 16px; }
+		.viewport { margin: auto; position: relative; overflow: hidden; border-radius: 7px; box-shadow: 0 6px 24px #202b3a22; background: #c9c9c9; }
+		iframe { position: absolute; inset: 0; border: 0; transform-origin: top left; }
+		.note { display: flex; gap: 28px; padding: 22px 0; }
+		.note p { margin: 0; flex: 1; font-size: 13px; color: #5d6571; }
+		.note strong { display: block; color: #303946; margin-bottom: 4px; }
+		button:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid #1565c0; outline-offset: 3px; }
+		@media (max-width: 700px) { main { padding: 24px 16px; } .concepts { grid-template-columns: 1fr; } .concept { padding: 12px 16px; } .concept small { font-size: 12px; } .controls { gap: 12px; } label { flex-wrap: wrap; } .preview-wrap { padding: 12px; } .note { flex-direction: column; gap: 14px; } .open { margin-left: 0; } }
+	</style>
+</head>
+<body>
+	<main>
+		<span class="eyebrow">ALL OR NOTHING · DESIGN EXPLORATION</span>
+		<h1>A quiet place for what’s next.</h1>
+		<p class="intro">Three ways to introduce the Steam edition and other games without interrupting play. Compare layouts, switch release platforms, and try browsing or dismissing a recommendation.</p>
+		<p><a href="recommended-layouts.png" target="_blank" rel="noopener">Desktop, phone, and TV comparison ↗</a> · <a href="alternative-layouts.png" target="_blank" rel="noopener">Alternative layouts ↗</a></p>
+		<div class="concepts">
+			<button class="concept" data-concept="ribbon" aria-pressed="true"><span class="number">01 · RECOMMENDED</span><strong>Menu ribbon</strong><small>One small card below the title menu. Always discoverable, easy to dismiss, and part of the layout.</small></button>
+			<button class="concept" data-concept="postcard" aria-pressed="false"><span class="number">02 · MORE VISUAL</span><strong>Corner postcard</strong><small>A compact capsule in desktop’s unused corner. Moves below the menu on small screens.</small></button>
+			<button class="concept" data-concept="shelf" aria-pressed="false"><span class="number">03 · MOST DISCREET</span><strong>Optional game shelf</strong><small>A “More games” menu entry opens a browsable catalog. Nothing is shown until the player chooses.</small></button>
+		</div>
+		<div class="controls">
+			<label>Release <select id="platform"><option value="web">Web / PWA</option><option value="electron">Standalone Electron</option><option value="steam">Steam</option></select></label>
+			<label>Display <select id="device"><option value="desktop">Desktop · 1280 × 800</option><option value="mobile">Phone · 390 × 844</option><option value="small">Small phone · 360 × 640</option><option value="landscape">Phone landscape · 844 × 390</option><option value="tv">Couch / TV · 1920 × 1080</option><option value="deck">Handheld · 1280 × 800</option></select></label>
+			<label><input id="focus" type="checkbox"> Show promotion focus</label>
+			<a class="open" id="open" href="mock.html?concept=ribbon&platform=web" target="_blank" rel="noopener">Open at full size ↗</a>
+		</div>
+		<div class="preview-wrap">
+			<div class="preview-meta"><span id="preview-title">Menu ribbon · Web / PWA</span><span id="dimensions">1280 × 800</span></div>
+			<div class="viewport" id="viewport"><iframe id="preview" title="Responsive game promotion mock" src="mock.html?concept=ribbon&platform=web"></iframe></div>
+		</div>
+		<div class="note"><p><strong>Rotation without distraction</strong>Try the arrows. The proposed shipping behavior changes the featured game on a later menu visit, while keeping it still during the current visit.</p><p><strong>Steam never promotes itself</strong>Switch to Steam to see other-game placeholders only. Actual game names, artwork, release status, and store IDs would replace the sample entries.</p><p><strong>Controller and touch</strong>Inside the preview, use arrow keys, Enter, and Escape. TV uses larger text and controls. This is keyboard simulation; native controller and Steam integration are not wired.</p></div>
+	</main>
+	<script>
+		const devices = { desktop: [1280, 800], mobile: [390, 844], small: [360, 640], landscape: [844, 390], tv: [1920, 1080], deck: [1280, 800] };
+		const preview = document.getElementById('preview');
+		const viewport = document.getElementById('viewport');
+		function update() {
+			const concept = document.querySelector('.concept[aria-pressed="true"]');
+			const platform = document.getElementById('platform');
+			const device = document.getElementById('device');
+			const focus = document.getElementById('focus');
+			const dimensions = devices[device.value];
+			const url = `mock.html?concept=${concept.dataset.concept}&platform=${platform.value}${focus.checked ? '&focus=promotion' : ''}`;
+			preview.src = url;
+			document.getElementById('open').href = url;
+			document.getElementById('dimensions').textContent = dimensions.join(' × ');
+			document.getElementById('preview-title').textContent = `${concept.querySelector('strong').textContent} · ${platform.selectedOptions[0].textContent}`;
+			resize();
+		}
+		function resize() {
+			const dimensions = devices[document.getElementById('device').value];
+			const available = document.querySelector('.preview-wrap').clientWidth - 42;
+			const scale = Math.min(1, available / dimensions[0], 760 / dimensions[1]);
+			viewport.style.width = `${dimensions[0] * scale}px`;
+			viewport.style.height = `${dimensions[1] * scale}px`;
+			preview.style.width = `${dimensions[0]}px`;
+			preview.style.height = `${dimensions[1]}px`;
+			preview.style.transform = `scale(${scale})`;
+		}
+		document.querySelectorAll('.concept').forEach(function (button) {
+			button.addEventListener('click', function () {
+				document.querySelectorAll('.concept').forEach(function (entry) { entry.setAttribute('aria-pressed', String(entry === button)); });
+				update();
+			});
+		});
+		document.querySelectorAll('select, input').forEach(function (control) { control.addEventListener('change', update); });
+		window.addEventListener('resize', resize);
+		update();
+	</script>
+</body>
+</html>

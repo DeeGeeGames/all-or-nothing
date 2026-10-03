@@ -42,7 +42,7 @@ const slideVariants = {
 	}),
 };
 
-export const MAX_MENU_BUTTONS = 5;
+export const MAX_MENU_BUTTONS = 6;
 export const MENU_ANIM_DURATION_MS = (
 	buttonContainerVariants.visible.transition.delayChildren +
 	buttonContainerVariants.visible.transition.staggerChildren * (MAX_MENU_BUTTONS - 1) +
@@ -102,7 +102,7 @@ function MenuButtons({
 	const skipSlide = !hasNavigatedRef.current || !!prefersReducedMotion;
 
 	return (
-		<Box display="inline-block" width={300}>
+		<Box display="inline-block" width={300} className="title-menu">
 			<motion.div
 				key={`buttons-${animKey}`}
 				variants={buttonContainerVariants}
@@ -119,7 +119,7 @@ function MenuButtons({
 						animate={menuAnimDone ? 'visible' : undefined}
 						exit={menuAnimDone ? 'exit' : undefined}
 					>
-						<Box display="flex" flexDirection="column" gap={2}>
+						<Box display="flex" flexDirection="column" gap={2} className="title-menu-buttons">
 							{items.map((item, index) => (
 								<motion.div
 									key={item.id}

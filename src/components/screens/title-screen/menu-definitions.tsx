@@ -13,6 +13,7 @@ import {
 	EmojiEvents as EmojiEventsIcon,
 	ArrowBack as ArrowBackIcon,
 	MoreHoriz as MoreHorizIcon,
+	SportsEsports as GamesIcon,
 } from '@mui/icons-material';
 import type { Enum } from '@/types';
 import FormattedTime from '@/components/formatted-time';
@@ -48,6 +49,7 @@ export interface MenuHandlers {
 	readonly handleTutorial: () => void;
 	readonly handleAbout: () => void;
 	readonly handleQuit: () => void;
+	readonly handleMoreGames: () => void;
 }
 
 interface BuildDeps {
@@ -170,13 +172,20 @@ const menuBuilders: Record<MenuId, (deps: BuildDeps) => readonly MenuItem[]> = {
 			label: 'Stats',
 			icon: <BarChartIcon />,
 			onClick: deps.handlers.handleStats,
-			autoFocus: true,
+			autoFocus: deps.focusTarget !== 'menu-more-games',
 		},
 		{
 			id: 'menu-achievements',
 			label: 'Achievements',
 			icon: <EmojiEventsIcon />,
 			onClick: deps.handlers.handleAchievements,
+		},
+		{
+			id: 'menu-more-games',
+			label: 'More from DeeGee Games',
+			icon: <GamesIcon />,
+			onClick: deps.handlers.handleMoreGames,
+			autoFocus: deps.focusTarget === 'menu-more-games',
 		},
 		{
 			id: 'menu-about',

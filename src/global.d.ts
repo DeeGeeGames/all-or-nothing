@@ -52,6 +52,8 @@ interface ElectronSteamAPI {
 
 interface ElectronAPI {
 	readonly platform: 'electron';
+	readonly getDistribution: () => Promise<'standalone' | 'steam'>;
+	readonly openGameStore: (id: string, inBrowser?: boolean) => Promise<boolean>;
 	readonly quit: () => void;
 	readonly setFullscreen: (enabled: boolean) => void;
 	readonly isFullscreen: () => Promise<boolean>;

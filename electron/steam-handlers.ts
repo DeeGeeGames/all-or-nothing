@@ -1,6 +1,9 @@
 import { ipcMain, app, type BrowserWindow } from 'electron';
 import { existsSync, readFileSync, appendFileSync } from 'fs';
 import { join, dirname } from 'path';
+import { getDesktopDistribution } from '../src/platform/distribution';
+
+declare const __STEAM_APP_ID__: number;
 
 let debugLogPath: string | null = null;
 function debugLog(msg: string): void {
@@ -25,10 +28,28 @@ let callbackInterval: ReturnType<typeof setInterval> | null = null;
 
 const exeDir = dirname(app.getPath('exe'));
 
-function isSteamEnvironment(): boolean {
-	if (process.env['SteamAppId']) return true;
+export function isSteamEnvironment(): boolean {
+	return getDesktopDistribution(process.env['SteamAppId'], existsSync(join(exeDir, 'steam_appid.txt')), __STEAM_APP_ID__) === 'steam';
+}
 
-	return existsSync(join(exeDir, 'steam_appid.txt'));
+export function openSteamStoreOverlay(appId: number): boolean {
+	try {
+		if (!steamInitialized || !steam.utils.isOverlayEnabled()) return false;
+		steam.overlay.activateGameOverlayToStore(appId);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+export function openSteamWebOverlay(url: string): boolean {
+	try {
+		if (!steamInitialized || !steam.utils.isOverlayEnabled()) return false;
+		steam.overlay.activateGameOverlayToWebPage(url);
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 const CLOUD_SAVE_FILE = 'savegame.json';

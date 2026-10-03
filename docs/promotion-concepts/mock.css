@@ -1,0 +1,196 @@
+@font-face { font-family: Roboto; font-weight: 300; src: url('/node_modules/@fontsource/roboto/files/roboto-latin-300-normal.woff2') format('woff2'); }
+@font-face { font-family: Roboto; font-weight: 400; src: url('/node_modules/@fontsource/roboto/files/roboto-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: Roboto; font-weight: 500; src: url('/node_modules/@fontsource/roboto/files/roboto-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: Roboto; font-weight: 700; src: url('/node_modules/@fontsource/roboto/files/roboto-latin-700-normal.woff2') format('woff2'); }
+* { box-sizing: border-box; }
+:root { font-family: Roboto, Arial, sans-serif; color: #262626; background: #c9c9c9; --blue: #1565c0; --muted: #60656b; }
+body { margin: 0; background: linear-gradient(135deg, #d8d8d8, #c0c0c0); }
+button { font: inherit; cursor: pointer; color: var(--blue); background: transparent; border: 1px solid #1976d280; border-radius: 5px; min-height: 44px; padding: 10px 16px; }
+button:hover { background: #e7f0fa; }
+button:focus-visible, .controller-focus { outline: 3px solid #1565c0; outline-offset: 5px; }
+button svg { width: 22px; height: 22px; }
+h1, h2, p { margin: 0; }
+.game-screen { min-height: 100svh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 36px; padding: 54px 6vw 90px; position: relative; }
+.hero { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 84px; width: min(920px, 100%); }
+.identity { text-align: center; }
+.demo-cards { display: flex; justify-content: center; gap: 16px; }
+.playing-card { width: 100px; height: 146px; border-radius: 8px; background: white; box-shadow: 0 2px 5px #0003; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 5px; flex-shrink: 0; padding: 8px; }
+.playing-card svg { width: 36px; height: 36px; }
+.identity h1 { font-size: 40px; font-weight: 300; padding-top: 44px; white-space: nowrap; }
+.menu { width: 300px; margin: auto; display: flex; flex-direction: column; gap: 16px; }
+.menu-button { display: flex; align-items: center; justify-content: center; gap: 10px; text-transform: uppercase; font-size: 15px; font-weight: 500; min-height: 44px; }
+.promotion { display: grid; grid-template-columns: 105px 1fr 84px; align-items: center; gap: 18px; width: min(650px, 100%); padding: 16px; border-radius: 10px; background: #f7f8faeb; border: 1px solid #fff8; box-shadow: 0 3px 12px #0000000b; }
+.eyebrow { color: #60656b; font-size: 10px; letter-spacing: 1.4px; font-weight: 700; }
+.promo-copy h2 { font-size: 19px; font-weight: 500; margin-top: 5px; }
+.promo-copy p { color: #61666b; font-size: 13px; margin-top: 5px; line-height: 1.4; }
+.store-link { padding: 7px 0 0; min-height: 32px; border: 0; font-size: 14px; font-weight: 500; text-align: left; }
+.art { overflow: hidden; border-radius: 7px; aspect-ratio: 1.5; display: flex; justify-content: center; align-items: center; width: 100%; }
+.art > svg { width: 100%; height: 100%; }
+.art-cards { background: #d6d9e3; }
+.art-puzzle { background: #4c3a74; }
+.art-arcade { background: #315c4b; }
+.mini-cards { display: flex; gap: 4px; transform: rotate(-9deg); padding: 13px 7px; }
+.mini-cards .playing-card { width: 24px; height: 37px; border-radius: 3px; padding: 3px; }
+.mini-cards .playing-card svg { width: 16px; height: 16px; }
+.promo-controls { align-self: stretch; display: flex; flex-direction: column; justify-content: space-between; align-items: end; }
+.dismiss { border: 0; color: #687078; font-size: 22px; width: 44px; height: 44px; padding: 0; margin-top: -8px; margin-right: -8px; }
+.browse-controls { display: flex; align-items: center; gap: 3px; }
+.browse-controls button { min-width: 32px; min-height: 44px; border: 0; padding: 0; font-size: 25px; }
+.browse-controls span { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.game-footer { position: absolute; bottom: max(20px, env(safe-area-inset-bottom)); left: 4vw; right: 4vw; display: flex; justify-content: space-between; align-items: center; gap: 20px; font-size: 16px; color: #474c52; }
+.input-hints { display: flex; align-items: center; gap: 10px; }
+.utility { border: 0; border-radius: 50%; background: #ffffff85; font-size: 23px; width: 44px; height: 44px; padding: 0; }
+.mock-label { font-size: 10px; letter-spacing: 1.2px; color: #62676d; }
+.glyph { display: inline-flex; border-radius: 50%; width: 30px; height: 30px; align-items: center; justify-content: center; background: #3c7243; color: white; font-weight: 700; }
+.key { border: 1px solid #777; border-radius: 4px; padding: 5px 8px; margin-left: 14px; font-size: 13px; }
+.postcard { position: absolute; right: 5vw; bottom: 98px; width: 310px; grid-template-columns: 1fr 70px; gap: 10px; }
+.postcard > .art { grid-column: 1 / -1; aspect-ratio: 3.8; }
+.postcard .art .mini-cards { transform: rotate(-9deg) scale(1.25); }
+body[data-concept="postcard"] .hero { transform: translateY(-85px); }
+.restore { border: 0; font-size: 13px; }
+.new-label { font-size: 9px; color: #646b73; letter-spacing: 1px; }
+.more-games { border-style: dashed; margin-top: 4px; }
+.shelf-screen { min-height: 100svh; padding: 44px max(6vw, env(safe-area-inset-left)) 40px; }
+.shelf-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.back { border: 0; padding-left: 0; }
+.shelf-heading { text-align: center; margin: 55px 0 36px; }
+.shelf-heading h1 { font-size: 48px; font-weight: 300; margin: 12px 0; }
+.shelf-heading p { color: #595f66; font-size: 18px; }
+.catalog { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; max-width: 1000px; margin: auto; }
+.catalog-card { background: #f8f9fb; border-radius: 12px; overflow: hidden; }
+.catalog-card .art { border-radius: 0; aspect-ratio: 1.8; }
+.catalog-card .mini-cards { transform: rotate(-9deg) scale(2.7); }
+.catalog-copy { padding: 24px; }
+.catalog-copy h2 { font-size: 24px; font-weight: 500; margin: 10px 0; }
+.catalog-copy p { color: #5f666e; font-size: 16px; line-height: 1.5; min-height: 48px; }
+.primary { background: #1565c0; color: white; border-color: #1565c0; margin-top: 18px; }
+.primary:hover { background: #0b4b95; }
+.shelf-footer { text-align: center; margin-top: 36px; color: #60656b; display: flex; align-items: center; justify-content: center; gap: 12px; }
+.back-glyph { background: #944444; margin-left: 24px; }
+dialog { max-width: min(500px, calc(100% - 40px)); border: 0; border-radius: 12px; padding: 28px; box-shadow: 0 12px 80px #0005; color: #262626; }
+dialog::backdrop { background: #151c2780; }
+dialog p { margin-top: 18px; line-height: 1.5; }
+.muted { color: #666; font-size: 14px; }
+@media (min-width: 1400px) and (min-height: 850px) {
+	.game-screen { gap: 70px; padding: 80px 7vw 140px; }
+	.hero { width: min(1370px, 100%); gap: 140px; }
+	.demo-cards { gap: 24px; }
+	.playing-card { width: 140px; height: 204px; }
+	.playing-card svg { width: 50px; height: 50px; }
+	.identity h1 { font-size: 56px; padding-top: 52px; }
+	.menu { width: 430px; gap: 20px; }
+	.menu-button { font-size: 24px; min-height: 68px; gap: 16px; }
+	.menu-button svg { width: 30px; height: 30px; }
+	.promotion { width: 980px; padding: 26px; grid-template-columns: 160px 1fr 130px; gap: 28px; border-radius: 14px; }
+	.promo-copy h2 { font-size: 30px; }
+	.promo-copy p { font-size: 23px; }
+	.eyebrow { font-size: 15px; }
+	.store-link { font-size: 24px; min-height: 48px; }
+	.browse-controls button { font-size: 32px; min-width: 48px; min-height: 48px; }
+	.browse-controls span { font-size: 18px; }
+	.dismiss { min-width: 48px; min-height: 48px; font-size: 30px; }
+	.mini-cards { transform: rotate(-9deg) scale(1.6); }
+	.mini-cards .playing-card svg { width: 16px; height: 16px; }
+	.game-footer { bottom: 5vh; left: 6vw; right: 6vw; font-size: 24px; }
+	.glyph { width: 40px; height: 40px; }
+	.key { font-size: 20px; }
+	.mock-label { font-size: 14px; }
+	.postcard { width: 430px; grid-template-columns: 1fr 120px; padding: 24px; bottom: 150px; right: 6vw; }
+	.postcard .promo-copy h2 { font-size: 27px; }
+	.postcard .promo-copy p { font-size: 21px; }
+	body[data-concept="postcard"] .hero { transform: translateY(-120px); }
+	.shelf-heading h1 { font-size: 64px; }
+	.shelf-heading p { font-size: 28px; }
+	.shelf-heading { margin-top: 85px; margin-bottom: 50px; }
+	.catalog { max-width: 1420px; gap: 40px; }
+	.catalog-copy { padding: 34px; }
+	.catalog-copy h2 { font-size: 34px; }
+	.catalog-copy p, .catalog-copy button, .shelf-footer, .back { font-size: 26px; }
+	.catalog-copy button { min-height: 60px; }
+	.catalog-copy p { min-height: 80px; }
+	.shelf-screen { padding-bottom: 40px; }
+	.shelf-heading { margin-top: 55px; }
+	.catalog-card .art { aspect-ratio: 2.7; }
+	.shelf-footer { margin-top: 30px; }
+	.new-label { font-size: 12px; }
+}
+@media (max-width: 699px) {
+	.game-screen { justify-content: center; gap: 24px; padding: max(24px, env(safe-area-inset-top)) 20px 76px; }
+	.hero { display: flex; flex-direction: column; gap: 28px; }
+	.playing-card { width: 82px; height: 120px; }
+	.playing-card svg { width: 29px; height: 29px; }
+	.demo-cards { gap: 12px; }
+	.identity h1 { font-size: 36px; padding-top: 26px; }
+	.menu { width: min(300px, 100%); gap: 12px; }
+	.menu-button { font-size: 14px; }
+	.promotion { width: min(360px, 100%); padding: 12px; gap: 10px; grid-template-columns: 58px 1fr 44px; }
+	.promo-copy h2 { font-size: 17px; }
+	.promo-copy p { font-size: 12px; }
+	.eyebrow { font-size: 8px; letter-spacing: .9px; }
+	.art { aspect-ratio: .9; }
+	.mini-cards { gap: 2px; transform: rotate(-9deg) scale(.65); }
+	.mini-cards .playing-card svg { width: 16px; height: 16px; }
+	.browse-controls { flex-wrap: wrap; width: 44px; justify-content: center; gap: 0; }
+	.browse-controls span { font-size: 10px; order: -1; width: 100%; text-align: center; }
+	.browse-controls button { min-width: 44px; min-height: 44px; }
+	.browse-controls button[data-action="previous"] { display: none; }
+	.store-link { font-size: 13px; min-height: 44px; padding-top: 4px; }
+	.promo-copy p { display: none; }
+	.postcard { position: static; grid-template-columns: 58px 1fr 44px; }
+	.postcard > .art { grid-column: auto; aspect-ratio: .9; }
+	.postcard .art .mini-cards { transform: rotate(-9deg) scale(.65); }
+	body[data-concept="postcard"] .hero { transform: none; }
+	.game-footer { bottom: max(14px, env(safe-area-inset-bottom)); left: 20px; right: 20px; }
+	.mock-label { font-size: 8px; }
+	.input-hints { font-size: 12px; gap: 6px; }
+	.key { font-size: 9px; margin-left: 4px; }
+	.shelf-screen { padding: 20px 20px 40px; }
+	.shelf-header .mock-label { display: none; }
+	.shelf-heading { margin: 24px 0; text-align: left; }
+	.shelf-heading h1 { font-size: 38px; }
+	.shelf-heading p { font-size: 16px; }
+	.catalog { grid-template-columns: 1fr; gap: 20px; }
+	.catalog-card .art { aspect-ratio: 2.7; }
+	.catalog-copy { padding: 20px; }
+	.catalog-copy h2 { font-size: 22px; }
+	.catalog-copy p { min-height: 0; font-size: 14px; }
+	.catalog-copy .primary { margin-top: 14px; }
+	.shelf-footer { font-size: 13px; line-height: 1.5; }
+}
+@media (max-width: 699px) and (max-height: 700px) {
+	.game-screen { gap: 16px; padding-top: 18px; padding-bottom: 64px; }
+	.playing-card { width: 64px; height: 91px; padding: 5px; gap: 3px; }
+	.playing-card svg { width: 24px; height: 24px; }
+	.identity h1 { padding-top: 18px; font-size: 32px; }
+	.hero { gap: 18px; }
+	.menu { gap: 8px; }
+	.promotion { padding: 8px 10px; }
+}
+@media (min-width: 700px) and (max-height: 540px) {
+	.game-screen { padding: 18px 5vw 58px; gap: 16px; }
+	.hero { gap: 38px; max-width: 760px; }
+	.playing-card { width: 70px; height: 100px; }
+	.playing-card svg { width: 25px; height: 25px; }
+	.identity h1 { font-size: 32px; padding-top: 18px; }
+	.menu { gap: 6px; width: 270px; }
+	.menu-button { min-height: 40px; padding: 8px; font-size: 13px; }
+	.promotion { padding: 7px 14px; grid-template-columns: 66px 1fr 86px; }
+	.promo-copy p { display: none; }
+	.promo-copy h2 { font-size: 16px; }
+	.promo-controls { flex-direction: row-reverse; align-items: center; }
+	.dismiss { margin: 0; }
+	.game-footer { bottom: 8px; }
+	.postcard { position: static; width: min(650px, 100%); grid-template-columns: 66px 1fr 86px; }
+	.postcard > .art { grid-column: auto; aspect-ratio: 1.5; }
+	body[data-concept="postcard"] .hero { transform: none; }
+	.shelf-heading { margin: 15px 0; }
+	.shelf-heading h1 { font-size: 32px; }
+}
+@media (max-width: 699px) and (max-height: 600px) {
+	.playing-card { width: 54px; height: 72px; gap: 2px; }
+	.playing-card svg { width: 18px; height: 18px; }
+	.identity h1 { padding-top: 12px; font-size: 28px; }
+	.hero { gap: 12px; }
+	.game-screen { gap: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }

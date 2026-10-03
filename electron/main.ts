@@ -1,7 +1,8 @@
-import { app, BrowserWindow, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { registerSteamHandlers, setSteamInputWindow, shutdownSteamInput } from './steam-handlers';
+import { registerSteamHandlers, setSteamInputWindow, shutdownSteamInput, isSteamEnvironment, openSteamStoreOverlay, openSteamWebOverlay } from './steam-handlers';
+import { findGame, getGameDestination } from '../src/promotions/catalog';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -44,6 +45,22 @@ ipcMain.on('app:setFullscreen', (_event, enabled: boolean) => {
 	win?.setFullScreen(enabled);
 });
 ipcMain.handle('app:isFullscreen', () => win?.isFullScreen() ?? false);
+ipcMain.handle('app:getDistribution', () => isSteamEnvironment() ? 'steam' : 'standalone');
+ipcMain.handle('app:openGameStore', async (_event, id: unknown, inBrowser: unknown) => {
+	const game = findGame(id);
+	if (!game || typeof inBrowser !== 'boolean') return false;
+	const distribution = isSteamEnvironment() ? 'steam' : 'standalone';
+	const destination = getGameDestination(game, distribution);
+	if (distribution === 'steam' && !inBrowser) {
+		return destination.kind === 'steam' ? openSteamStoreOverlay(game.steamAppId) : openSteamWebOverlay(destination.url);
+	}
+	try {
+		await shell.openExternal(destination.url);
+		return true;
+	} catch {
+		return false;
+	}
+});
 
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => app.quit());
