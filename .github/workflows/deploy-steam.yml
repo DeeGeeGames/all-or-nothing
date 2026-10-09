@@ -8,9 +8,10 @@ on:
         type: string
         required: true
       release-branch:
-        description: Steam branch to deploy to (e.g. default, prerelease)
+        description: Beta branch to set live after upload, such as prerelease. Leave empty to upload without setting a branch live. Do not pass default. steamcmd cannot set the default branch live on a released app.
         type: string
-        required: true
+        required: false
+        default: ''
 
 jobs:
   deploy:
@@ -18,7 +19,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          sparse-checkout: steam
+          sparse-checkout: |
+            .github/scripts
+            steam
       - name: Download Windows build
         uses: actions/download-artifact@v8
         with:
@@ -29,7 +32,15 @@ jobs:
         with:
           name: steam-linux
           path: builds/linux
-      - uses: game-ci/steam-deploy@v3
+      - name: Reject the Steam default branch
+        if: inputs.release-branch == 'default'
+        run: |
+          echo "steamcmd cannot set the default branch live on a released app."
+          echo "Leave release-branch empty and set the uploaded build live in Steamworks."
+          exit 1
+      - name: Upload and set a beta branch live
+        if: inputs.release-branch != '' && inputs.release-branch != 'default'
+        uses: game-ci/steam-deploy@v3
         with:
           username: ${{ secrets.STEAM_USERNAME }}
           configVdf: ${{ secrets.STEAM_CONFIG_VDF }}
@@ -40,3 +51,11 @@ jobs:
           depot2Path: linux
           depot2InstallScriptPath: steam/install_script_linux.vdf
           releaseBranch: ${{ inputs.release-branch }}
+      - name: Upload without setting a branch live
+        if: inputs.release-branch == ''
+        env:
+          STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
+          STEAM_CONFIG_VDF: ${{ secrets.STEAM_CONFIG_VDF }}
+          STEAM_APP_ID: ${{ secrets.STEAM_APP_ID }}
+          BUILD_DESCRIPTION: ${{ inputs.build-description }}
+        run: bash .github/scripts/upload-steam-build.sh

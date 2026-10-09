@@ -121,7 +121,6 @@ jobs:
     uses: ./.github/workflows/deploy-steam.yml
     with:
       build-description: ${{ github.ref_name }}
-      release-branch: default
     secrets: inherit
 
   sync_version:
